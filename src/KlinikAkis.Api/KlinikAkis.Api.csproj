@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\KlinikAkis.Infrastructure\KlinikAkis.Infrastructure.csproj" />
+    <ProjectReference Include="..\KlinikAkis.Domain\KlinikAkis.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.14" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.18.5" />
+  </ItemGroup>
+
+</Project>

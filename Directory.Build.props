@@ -1,0 +1,14 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- Uygulama projelerinde uyarı = hata; test projesi hariç -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'KlinikAkis.Api' Or '$(MSBuildProjectName)' == 'KlinikAkis.Domain' Or '$(MSBuildProjectName)' == 'KlinikAkis.Infrastructure'">
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+</Project>

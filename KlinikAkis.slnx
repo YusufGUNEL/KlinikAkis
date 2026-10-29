@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/KlinikAkis.Api/KlinikAkis.Api.csproj" />
+    <Project Path="src/KlinikAkis.Domain/KlinikAkis.Domain.csproj" />
+    <Project Path="src/KlinikAkis.Infrastructure/KlinikAkis.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/KlinikAkis.Tests/KlinikAkis.Tests.csproj" />
+  </Folder>
+</Solution>

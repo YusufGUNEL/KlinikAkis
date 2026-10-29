@@ -1,0 +1,37 @@
+# Kişisel çalışma notları (commit edilmez)
+_calisma/
+
+# .NET
+bin/
+obj/
+*.user
+*.db
+*.db-shm
+*.db-wal
+appsettings.Development.local.json
+
+# Angular / Node
+node_modules/
+dist/
+.angular/
+src/KlinikAkis.Api/wwwroot/
+# PrimeUI lisans anahtarı (scripts/lisans-yaz.mjs üretir / okur)
+src/web/.primeui-license
+src/web/src/app/lisans.ts
+
+# Python
+__pycache__/
+.venv/
+venv/
+
+# Ortam / sırlar
+.env
+.env.*
+
+# IDE
+.vs/
+.vscode/
+.idea/
+
+# Claude Code kişisel komutları / ayarları (commit edilmez)
+.claude/
