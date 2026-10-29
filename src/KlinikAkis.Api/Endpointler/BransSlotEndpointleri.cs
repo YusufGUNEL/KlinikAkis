@@ -1,4 +1,5 @@
 using System.Globalization;
+using KlinikAkis.Api.Kimlik;
 using KlinikAkis.Domain;
 using KlinikAkis.Infrastructure.Veri;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -14,6 +15,7 @@ public static class BransSlotEndpointleri
             .WithSummary("Bölüm listesi (hekimi olmayan bölümler de döner, hekimSayisi = 0)");
 
         api.MapGet("/slotlar", Slotlar).WithTags("Bölüm ve slot").WithName("Slotlar")
+            .RequireAuthorization(DemoRol.Hasta)
             .ProducesProblem(StatusCodes.Status404NotFound).ProducesValidationProblem()
             .WithSummary("Bölümdeki boş ve gelecekteki saatler; tarih (yyyy-MM-dd, İstanbul) verilmezse sonraki tüm slotlar");
 

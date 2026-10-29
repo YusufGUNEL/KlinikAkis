@@ -1,19 +1,22 @@
+using System.Security.Claims;
+using KlinikAkis.Api.Kimlik;
 using KlinikAkis.Domain;
+using KlinikAkis.Domain.Varliklar;
 using KlinikAkis.Infrastructure.Veri;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 
 namespace KlinikAkis.Api.Endpointler;
 
-// Rol kontrolü (doktor) ve erişim kaydı Aşama 2'de JWT ile eklenir.
 public static class HastaEndpointleri
 {
     public static RouteGroupBuilder MapHastaEndpointleri(this RouteGroupBuilder api)
     {
-        var hastalar = api.MapGroup("/hastalar/{id:guid}").WithTags("Hasta");
+        var hastalar = api.MapGroup("/hastalar/{id:guid}").WithTags("Hasta")
+            .RequireAuthorization(DemoRol.Doktor);
 
         hastalar.MapGet("/ozet", Ozet).WithName("HastaOzeti").ProducesProblem(StatusCodes.Status404NotFound)
-            .WithSummary("Hasta bandı: kimlik (maskeli TC), yaş, alerjiler, kronik hastalıklar, ilaçlar");
+            .WithSummary("Hasta bandı: kimlik (maskeli TC), yaş, alerjiler, kronik hastalıklar, ilaçlar; erişim kaydı yazar");
 
         hastalar.MapGet("/tahliller", Tahliller).WithName("HastaTahlilleri").ProducesProblem(StatusCodes.Status404NotFound)
             .WithSummary("Teste göre gruplu sonuçlar: hastanın cinsiyetine göre referans, son değer, kodla verilen işaret, trend");
@@ -22,11 +25,22 @@ public static class HastaEndpointleri
     }
 
     private static async Task<Results<Ok<HastaOzeti>, ProblemHttpResult>> Ozet(
-        Guid id, KlinikDbContext db, TimeProvider zaman, CancellationToken ct)
+        Guid id, ClaimsPrincipal kullanici, KlinikDbContext db, TimeProvider zaman, CancellationToken ct)
     {
         var h = await db.Hastalar.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
         if (h is null)
             return TypedResults.Problem(detail: "Hasta bulunamadı.", statusCode: StatusCodes.Status404NotFound);
+
+        db.ErisimKayitlari.Add(new ErisimKaydi
+        {
+            Id = Guid.NewGuid(),
+            Zaman = zaman.GetUtcNow().UtcDateTime,
+            KullaniciRol = kullanici.FindFirstValue(DemoClaim.Rol) ?? "",
+            KullaniciAd = kullanici.FindFirstValue(DemoClaim.Ad) ?? "",
+            HastaId = id,
+            Eylem = "Görüntüledi",
+        });
+        await db.SaveChangesAsync(ct);
 
         return TypedResults.Ok(new HastaOzeti(
             h.Id, h.Ad, h.Soyad, IstanbulSaati.Yas(h.DogumTarihi, zaman.GetUtcNow().UtcDateTime), h.Cinsiyet,

@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using KlinikAkis.Api.Kimlik;
 using KlinikAkis.Domain;
 using KlinikAkis.Infrastructure.Seed;
 using KlinikAkis.Infrastructure.Veri;
@@ -8,14 +10,16 @@ namespace KlinikAkis.Api.Endpointler;
 
 public static class DemoEndpointleri
 {
-    private static readonly string[] Roller = ["hasta", "doktor", "kabul", "tv"];
-
     public static RouteGroupBuilder MapDemoEndpointleri(this RouteGroupBuilder api)
     {
         var demo = api.MapGroup("/demo").WithTags("Demo");
 
         demo.MapGet("/kimlikler", Kimlikler).WithName("DemoKimlikler")
             .WithSummary("Rol seçicide listelenecek kimlikler (6 senaryo hasta / hekimler / TV için bölümler)");
+
+        demo.MapPost("/login", Giris).WithName("DemoGiris")
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .WithSummary("Rol + kimlik → 8 saatlik demo JWT (gerçek kimlik doğrulama yok, SPEC §14)");
 
         demo.MapPost("/reset", async (DemoSifirlayici sifirlayici, CancellationToken ct) =>
                 TypedResults.Ok(await sifirlayici.SifirlaAsync(ct)))
@@ -28,11 +32,8 @@ public static class DemoEndpointleri
     private static async Task<Results<Ok<List<KimlikOgesi>>, ValidationProblem>> Kimlikler(
         string rol, KlinikDbContext db, TimeProvider zaman, CancellationToken ct)
     {
-        if (!Roller.Contains(rol, StringComparer.Ordinal))
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["rol"] = [$"Rol şunlardan biri olmalı: {string.Join(", ", Roller)}."],
-            });
+        if (!DemoRol.Hepsi.Contains(rol, StringComparer.Ordinal))
+            return RolHatasi();
 
         var simdi = zaman.GetUtcNow().UtcDateTime;
         List<KimlikOgesi> liste = rol switch
@@ -47,6 +48,51 @@ public static class DemoEndpointleri
         };
         return TypedResults.Ok(liste);
     }
+
+    private static async Task<Results<Ok<GirisYaniti>, ProblemHttpResult, ValidationProblem>> Giris(
+        GirisIstegi istek, KlinikDbContext db, DemoTokenUretici uretici, CancellationToken ct)
+    {
+        if (!DemoRol.Hepsi.Contains(istek.Rol, StringComparer.Ordinal))
+            return RolHatasi();
+        if (istek.Rol != DemoRol.Kabul && istek.KimlikId is null)
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["kimlikId"] = ["Bu rol için kimlik seçilmeli."],
+            });
+
+        var id = istek.KimlikId.GetValueOrDefault();
+        (string Ad, Claim[] Claimler)? kimlik = istek.Rol switch
+        {
+            DemoRol.Hasta => await db.Hastalar.Where(h => h.Id == id)
+                .Select(h => new { h.Ad, h.Soyad }).FirstOrDefaultAsync(ct) is { } h
+                ? ($"{h.Ad} {h.Soyad[..1]}.", [new Claim(DemoClaim.HastaId, id.ToString())])
+                : null,
+            DemoRol.Doktor => await db.Hekimler.Where(x => x.Id == id)
+                .Select(x => new { x.Unvan, x.Ad, x.BransId }).FirstOrDefaultAsync(ct) is { } d
+                ? ($"{d.Unvan} {d.Ad}",
+                    [new Claim(DemoClaim.HekimId, id.ToString()), new Claim(DemoClaim.BransId, d.BransId.ToString())])
+                : null,
+            // TV yalnızca hekimi olan bölümler için açılır (kimlikler listesiyle aynı kural).
+            DemoRol.Tv => await db.Branslar.Where(b => b.Id == id && db.Hekimler.Any(x => x.BransId == b.Id))
+                .Select(b => b.Ad).FirstOrDefaultAsync(ct) is { } bransAd
+                ? ($"{bransAd} TV", [new Claim(DemoClaim.BransId, id.ToString())])
+                : null,
+            _ => ("Kabul görevlisi", []),
+        };
+        if (kimlik is not { } k)
+            return TypedResults.Problem(detail: "Seçilen kimlik bulunamadı.", statusCode: StatusCodes.Status404NotFound);
+
+        Claim[] claimler = [new(DemoClaim.Rol, istek.Rol), new(DemoClaim.Ad, k.Ad), .. k.Claimler];
+        var (token, bitis) = uretici.Uret(claimler);
+        var kimlikId = istek.Rol == DemoRol.Kabul ? (Guid?)null : id;
+        return TypedResults.Ok(new GirisYaniti(token, istek.Rol, kimlikId, k.Ad, bitis));
+    }
+
+    private static ValidationProblem RolHatasi() =>
+        TypedResults.ValidationProblem(new Dictionary<string, string[]>
+        {
+            ["rol"] = [$"Rol şunlardan biri olmalı: {string.Join(", ", DemoRol.Hepsi)}."],
+        });
 
     private static async Task<List<KimlikOgesi>> SenaryoHastalari(KlinikDbContext db, DateTime simdi, CancellationToken ct)
     {
@@ -74,3 +120,7 @@ public static class DemoEndpointleri
 }
 
 public sealed record KimlikOgesi(Guid Id, string Ad, string Aciklama);
+
+public sealed record GirisIstegi(string Rol, Guid? KimlikId);
+
+public sealed record GirisYaniti(string Token, string Rol, Guid? KimlikId, string Ad, DateTime Bitis);

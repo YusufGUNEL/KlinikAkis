@@ -10,10 +10,14 @@ public sealed class ApiTestleri(KlinikApiFabrikasi fabrika) : IClassFixture<Klin
 {
     private readonly HttpClient _istemci = fabrika.CreateClient();
 
+    private Task<HttpClient> Doktor() => fabrika.GirisYapAsync("doktor", SenaryoIdleri.HekimEndokrinoloji);
+
+    private Task<HttpClient> Hasta() => fabrika.GirisYapAsync("hasta", SenaryoIdleri.Ayse);
+
     [Fact]
     public async Task Ayse_ozeti_alerji_ve_maskeli_TC_icerir()
     {
-        var ozet = await Getir($"/api/hastalar/{SenaryoIdleri.Ayse}/ozet");
+        var ozet = await Getir(await Doktor(), $"/api/hastalar/{SenaryoIdleri.Ayse}/ozet");
 
         Assert.Equal("Ayşe", ozet.GetProperty("ad").GetString());
         Assert.Equal(54, ozet.GetProperty("yas").GetInt32());
@@ -25,7 +29,7 @@ public sealed class ApiTestleri(KlinikApiFabrikasi fabrika) : IClassFixture<Klin
     [Fact]
     public async Task Ayse_tahlilleri_HbA1c_trendi_ve_kod_isareti_ile_doner()
     {
-        var satirlar = await Getir($"/api/hastalar/{SenaryoIdleri.Ayse}/tahliller");
+        var satirlar = await Getir(await Doktor(), $"/api/hastalar/{SenaryoIdleri.Ayse}/tahliller");
         var hba1c = satirlar.EnumerateArray().Single(s => s.GetProperty("loincKodu").GetString() == "4548-4");
 
         var trend = hba1c.GetProperty("trend").EnumerateArray().Select(t => t.GetProperty("deger").GetDecimal()).ToArray();
@@ -41,7 +45,7 @@ public sealed class ApiTestleri(KlinikApiFabrikasi fabrika) : IClassFixture<Klin
     [Fact]
     public async Task Slotlar_yalnizca_bos_ve_gelecekteki_saatleri_doner()
     {
-        var slotlar = await Getir($"/api/slotlar?bransId={DemoVeriTohumu.BransId(Domain.BransKodu.Endokrinoloji)}");
+        var slotlar = await Getir(await Hasta(), $"/api/slotlar?bransId={DemoVeriTohumu.BransId(Domain.BransKodu.Endokrinoloji)}");
 
         Assert.NotEmpty(slotlar.EnumerateArray());
         Assert.All(slotlar.EnumerateArray(), s =>
@@ -60,7 +64,7 @@ public sealed class ApiTestleri(KlinikApiFabrikasi fabrika) : IClassFixture<Klin
         var dolular = db.Slotlar.Where(s => s.HekimId == hekimId && s.Dolu).Select(s => s.Id).ToHashSet();
         Assert.NotEmpty(dolular);
 
-        var slotlar = await Getir($"/api/slotlar?bransId={DemoVeriTohumu.BransId(Domain.BransKodu.Endokrinoloji)}");
+        var slotlar = await Getir(await Hasta(), $"/api/slotlar?bransId={DemoVeriTohumu.BransId(Domain.BransKodu.Endokrinoloji)}");
 
         Assert.DoesNotContain(slotlar.EnumerateArray(), s => dolular.Contains(s.GetProperty("id").GetGuid()));
     }
@@ -71,8 +75,8 @@ public sealed class ApiTestleri(KlinikApiFabrikasi fabrika) : IClassFixture<Klin
         var endo = DemoVeriTohumu.BransId(Domain.BransKodu.Endokrinoloji);
 
         // Sabit saat 29.10.2026 14:00 İstanbul; 8 saatlik slotlar 22:00'de biter → hepsi 29.10'da.
-        var bugun = await Getir($"/api/slotlar?bransId={endo}&tarih=2026-10-29");
-        var yarin = await Getir($"/api/slotlar?bransId={endo}&tarih=2026-10-30");
+        var bugun = await Getir(await Hasta(), $"/api/slotlar?bransId={endo}&tarih=2026-10-29");
+        var yarin = await Getir(await Hasta(), $"/api/slotlar?bransId={endo}&tarih=2026-10-30");
 
         Assert.NotEmpty(bugun.EnumerateArray());
         Assert.Empty(yarin.EnumerateArray());
@@ -86,7 +90,7 @@ public sealed class ApiTestleri(KlinikApiFabrikasi fabrika) : IClassFixture<Klin
     {
         var endo = DemoVeriTohumu.BransId(Domain.BransKodu.Endokrinoloji);
 
-        var yanit = await _istemci.GetAsync($"/api/slotlar?bransId={endo}&tarih={Uri.EscapeDataString(tarih)}");
+        var yanit = await (await Hasta()).GetAsync($"/api/slotlar?bransId={endo}&tarih={Uri.EscapeDataString(tarih)}");
 
         Assert.Equal(HttpStatusCode.BadRequest, yanit.StatusCode);
     }
@@ -94,7 +98,7 @@ public sealed class ApiTestleri(KlinikApiFabrikasi fabrika) : IClassFixture<Klin
     [Fact]
     public async Task Hekimi_olmayan_bolumde_slot_listesi_bos()
     {
-        var slotlar = await Getir($"/api/slotlar?bransId={DemoVeriTohumu.BransId(Domain.BransKodu.Dermatoloji)}");
+        var slotlar = await Getir(await Hasta(), $"/api/slotlar?bransId={DemoVeriTohumu.BransId(Domain.BransKodu.Dermatoloji)}");
 
         Assert.Empty(slotlar.EnumerateArray());
     }
@@ -102,7 +106,7 @@ public sealed class ApiTestleri(KlinikApiFabrikasi fabrika) : IClassFixture<Klin
     [Fact]
     public async Task Kimlikler_hasta_rolunde_6_senaryo_hastasini_Ayse_ilk_doner()
     {
-        var kimlikler = await Getir("/api/demo/kimlikler?rol=hasta");
+        var kimlikler = await Getir(_istemci, "/api/demo/kimlikler?rol=hasta");
 
         Assert.Equal(6, kimlikler.GetArrayLength());
         Assert.Equal(SenaryoIdleri.Ayse, kimlikler[0].GetProperty("id").GetGuid());
@@ -112,18 +116,20 @@ public sealed class ApiTestleri(KlinikApiFabrikasi fabrika) : IClassFixture<Klin
     [Fact]
     public async Task Kimlikler_doktor_rolunde_6_hekim_doner()
     {
-        var kimlikler = await Getir("/api/demo/kimlikler?rol=doktor");
+        var kimlikler = await Getir(_istemci, "/api/demo/kimlikler?rol=doktor");
 
         Assert.Equal(6, kimlikler.GetArrayLength());
     }
 
     [Theory]
-    [InlineData("/api/hastalar/00000000-0000-0000-0000-000000000000/ozet")]
-    [InlineData("/api/hastalar/00000000-0000-0000-0000-000000000000/tahliller")]
-    [InlineData("/api/slotlar?bransId=00000000-0000-0000-0000-000000000000")]
-    public async Task Bilinmeyen_kayit_404_ProblemDetails_doner(string yol)
+    [InlineData("doktor", "/api/hastalar/00000000-0000-0000-0000-000000000000/ozet")]
+    [InlineData("doktor", "/api/hastalar/00000000-0000-0000-0000-000000000000/tahliller")]
+    [InlineData("hasta", "/api/slotlar?bransId=00000000-0000-0000-0000-000000000000")]
+    public async Task Bilinmeyen_kayit_404_ProblemDetails_doner(string rol, string yol)
     {
-        var yanit = await _istemci.GetAsync(yol);
+        var istemci = rol == "doktor" ? await Doktor() : await Hasta();
+
+        var yanit = await istemci.GetAsync(yol);
 
         Assert.Equal(HttpStatusCode.NotFound, yanit.StatusCode);
         Assert.Equal("application/problem+json", yanit.Content.Headers.ContentType?.MediaType);
@@ -137,9 +143,9 @@ public sealed class ApiTestleri(KlinikApiFabrikasi fabrika) : IClassFixture<Klin
         Assert.Equal(HttpStatusCode.BadRequest, yanit.StatusCode);
     }
 
-    private async Task<JsonElement> Getir(string yol)
+    private static async Task<JsonElement> Getir(HttpClient istemci, string yol)
     {
-        var yanit = await _istemci.GetAsync(yol);
+        var yanit = await istemci.GetAsync(yol);
         Assert.Equal(HttpStatusCode.OK, yanit.StatusCode);
         return JsonDocument.Parse(await yanit.Content.ReadAsStringAsync()).RootElement;
     }

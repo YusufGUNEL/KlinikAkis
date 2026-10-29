@@ -89,6 +89,7 @@ Sentetik hasta **"Ayşe K., 54, K"** (Tip 2 DM takibinde, penisilin alerjisi) il
 | AI | `Microsoft.Extensions.AI` + sağlayıcı paketi (Anthropic SDK, Ollama) · `ChatClientBuilder().UseLogging()` | Tek arayüz; istek/yanıt günlüğü ara katmanla, elle değil |
 | Doğrulama | .NET 10 yerleşik Minimal API doğrulaması (`AddValidation`, DataAnnotations) | FluentValidation gereksiz; yoksa (sürüm doğrulanınca) DataAnnotations + endpoint filtresi |
 | Hız sınırı | Yerleşik `Microsoft.AspNetCore.RateLimiting` | §9.9 |
+| Demo JWT | `Microsoft.AspNetCore.Authentication.JwtBearer` (token üretimi geçişli gelen `Microsoft.IdentityModel.JsonWebTokens` ile) | §7, §8 (SignalR `access_token`); Aşama 2'de kullanıcı onayıyla eklendi |
 | Veri | `Bogus`, EF Core `Sqlite` + `Npgsql` sağlayıcıları | §5, §6 |
 | API dokümanı | `Microsoft.AspNetCore.OpenApi` + `Scalar.AspNetCore` | |
 | Test | `xunit`, `Microsoft.AspNetCore.Mvc.Testing`, `Microsoft.AspNetCore.SignalR.Client` (+ xUnit şablonunun zorunlu parçaları `Microsoft.NET.Test.Sdk`, `xunit.runner.visualstudio`) | Entegrasyon + hub testi |

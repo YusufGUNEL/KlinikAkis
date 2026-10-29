@@ -1,3 +1,6 @@
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -19,7 +22,19 @@ public sealed class KlinikApiFabrikasi : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Development");
         builder.UseSetting("ConnectionStrings:Default", $"Data Source={DbYolu}");
+        builder.UseSetting("Jwt:Key", "test-anahtari-yalnizca-testlerde-kullanilir-32+");
         builder.ConfigureTestServices(s => s.Replace(ServiceDescriptor.Singleton<TimeProvider>(new SabitZaman(Simdi))));
+    }
+
+    /// <summary>/api/demo/login ile token alır; token'ı Authorization başlığına koyan istemci döner.</summary>
+    public async Task<HttpClient> GirisYapAsync(string rol, Guid? kimlikId = null)
+    {
+        var istemci = CreateClient();
+        var yanit = await istemci.PostAsJsonAsync("/api/demo/login", new { rol, kimlikId });
+        yanit.EnsureSuccessStatusCode();
+        var token = JsonDocument.Parse(await yanit.Content.ReadAsStringAsync()).RootElement.GetProperty("token").GetString();
+        istemci.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return istemci;
     }
 
     protected override void Dispose(bool disposing)
