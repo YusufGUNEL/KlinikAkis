@@ -1,10 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace KlinikAkis.Tests;
 
-public sealed class SaglikTestleri(WebApplicationFactory<Program> fabrika) : IClassFixture<WebApplicationFactory<Program>>
+public sealed class SaglikTestleri(KlinikApiFabrikasi fabrika) : IClassFixture<KlinikApiFabrikasi>
 {
     [Fact]
     public async Task Health_200_ve_ok_doner()
@@ -18,5 +17,7 @@ public sealed class SaglikTestleri(WebApplicationFactory<Program> fabrika) : ICl
         Assert.NotNull(govde);
         Assert.Equal("ok", govde.Durum);
         Assert.Equal(DateTimeKind.Utc, govde.Zaman.Kind);
+        // Test, geçici veritabanına bağlanmış olmalı (geliştirme .db dosyasına değil).
+        Assert.True(File.Exists(fabrika.DbYolu));
     }
 }
