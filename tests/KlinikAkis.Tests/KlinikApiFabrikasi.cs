@@ -30,11 +30,15 @@ public sealed class KlinikApiFabrikasi : WebApplicationFactory<Program>
     public async Task<HttpClient> GirisYapAsync(string rol, Guid? kimlikId = null)
     {
         var istemci = CreateClient();
-        var yanit = await istemci.PostAsJsonAsync("/api/demo/login", new { rol, kimlikId });
-        yanit.EnsureSuccessStatusCode();
-        var token = JsonDocument.Parse(await yanit.Content.ReadAsStringAsync()).RootElement.GetProperty("token").GetString();
-        istemci.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        istemci.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", await TokenAlAsync(rol, kimlikId));
         return istemci;
+    }
+
+    public async Task<string> TokenAlAsync(string rol, Guid? kimlikId = null)
+    {
+        var yanit = await CreateClient().PostAsJsonAsync("/api/demo/login", new { rol, kimlikId });
+        yanit.EnsureSuccessStatusCode();
+        return JsonDocument.Parse(await yanit.Content.ReadAsStringAsync()).RootElement.GetProperty("token").GetString()!;
     }
 
     protected override void Dispose(bool disposing)

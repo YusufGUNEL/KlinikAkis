@@ -79,7 +79,7 @@ Sentetik hasta **"Ayşe K., 54, K"** (Tip 2 DM takibinde, penisilin alerjisi) il
 | Test | **xUnit** (backend, `WebApplicationFactory`), Angular varsayılan test koşucusu | §11 |
 | API dokümanı | Yerleşik OpenAPI + **Scalar** | |
 | CI | GitHub Actions: backend build + test, Angular build | |
-| Yayın | Tek **Docker** imajı (API + hub + Angular `dist/.../browser` → `wwwroot`) → **Render** ücretsiz web servisi | Tek origin: CORS/WebSocket sorunu yok. **Debian tabanlı** `aspnet` imajı (Alpine değil, §10.5) |
+| Yayın | Tek **Docker** imajı (API + hub + Angular `dist/.../browser` → `wwwroot`) → **Render** ücretsiz web servisi | Tek origin: CORS/WebSocket sorunu yok. **Ubuntu tabanlı** `aspnet:10.0-noble` imajı (Alpine değil, §10.5) |
 | Eval | Python 3.12 script (deploy edilmez) | |
 
 ### 3.1 Yardımcı paketler (liste kapalıdır; yenisi kullanıcıya sorulur)
@@ -560,8 +560,9 @@ Butonlar yalnızca durum makinesine uygun olduğunda etkin. Tablolar 32-36 px sa
   karşılaştırmalarını bozar.)
 - API decimal'leri JSON sayısı (nokta) döner; UTC zamanlar `Z` ekli ISO 8601.
 - Sunucu "bugün"ü `TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul")` ile hesaplar.
-- Docker: **Debian tabanlı** `aspnet` imajı (ICU + tzdata içerir). Alpine'de `InvariantGlobalization`
-  açık gelir ve tr-TR işlemleri bozulur.
+- Docker: **Ubuntu tabanlı** `aspnet:10.0-noble` imajı (ICU + tzdata içerir). Alpine'de `InvariantGlobalization`
+  açık gelir ve tr-TR işlemleri bozulur. (İlk karar Debian'dı; Microsoft .NET 10 için Debian imajı
+  yayınlamadığından Aşama 3'te kullanıcı onayıyla Ubuntu'ya geçildi — amaç aynı: ICU + tzdata, Alpine değil.)
 
 ---
 
@@ -590,11 +591,11 @@ Her aşama kendi testlerini **o aşamada** yazar; Aşama 9 eksik kalan varsa tam
 
 ## 12. Yayın ve demo güvenilirliği
 
-- Çok aşamalı `Dockerfile`: Node (LTS) ile Angular build → .NET SDK ile publish → Debian `aspnet`
+- Çok aşamalı `Dockerfile`: Node (LTS) ile Angular build → .NET SDK ile publish → Ubuntu `aspnet:10.0-noble`
   çalışma imajı; Angular çıktısı (`dist/<proje>/browser`) `wwwroot`'a kopyalanır.
   `UseDefaultFiles` + `UseStaticFiles` + `MapFallbackToFile("index.html")` (SPA rotaları).
 - Render ücretsiz web servisi (Docker) + Neon Postgres. Render'ın verdiği `PORT` değişkeni
-  `Program.cs`'te okunur. Ters vekil arkasında `ForwardedHeaders`. Health check yolu `/api/health`.
+  `Program.cs`'te okunur. Ters vekil arkasında `ForwardedHeaders` (imajda `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`). Health check yolu `/api/health`.
 - Ortam değişkenleri: `ConnectionStrings__Default` (Neon, `SSL Mode=Require`), `Db__Provider=Postgres`,
   `AI__Provider`, `ANTHROPIC_API_KEY`, `Jwt__Key`, `AI__GunlukLimit`. Angular derlemesi için
   `PRIMEUI_LICENSE` (Docker build argümanı; PrimeNG 22 PrimeUI License ile gelir, ücretsiz Community

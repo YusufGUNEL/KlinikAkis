@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using KlinikAkis.Api.Gercekzaman;
 using KlinikAkis.Api.Kimlik;
 using KlinikAkis.Domain;
 using KlinikAkis.Infrastructure.Seed;
@@ -21,8 +22,13 @@ public static class DemoEndpointleri
             .ProducesProblem(StatusCodes.Status404NotFound)
             .WithSummary("Rol + kimlik → 8 saatlik demo JWT (gerçek kimlik doğrulama yok, SPEC §14)");
 
-        demo.MapPost("/reset", async (DemoSifirlayici sifirlayici, CancellationToken ct) =>
-                TypedResults.Ok(await sifirlayici.SifirlaAsync(ct)))
+        demo.MapPost("/reset", async (DemoSifirlayici sifirlayici, IOlayYayinci yayinci, CancellationToken ct) =>
+            {
+                var sonuc = await sifirlayici.SifirlaAsync(ct);
+                // Açık tüm ekranlar eski id'leri tutuyor; yeniden yüklensinler.
+                await yayinci.YayinlaAsync(OlayTuru.DemoSifirlandi, null, [Grup.Demo], ct);
+                return TypedResults.Ok(sonuc);
+            })
             .WithName("DemoSifirla")
             .WithSummary("Tüm veriyi seed durumuna döndürür; slotlar şimdiye göre yeniden üretilir");
 
@@ -65,7 +71,7 @@ public static class DemoEndpointleri
         {
             DemoRol.Hasta => await db.Hastalar.Where(h => h.Id == id)
                 .Select(h => new { h.Ad, h.Soyad }).FirstOrDefaultAsync(ct) is { } h
-                ? ($"{h.Ad} {h.Soyad[..1]}.", [new Claim(DemoClaim.HastaId, id.ToString())])
+                ? (AdGosterimi.Kisa(h.Ad, h.Soyad), [new Claim(DemoClaim.HastaId, id.ToString())])
                 : null,
             DemoRol.Doktor => await db.Hekimler.Where(x => x.Id == id)
                 .Select(x => new { x.Unvan, x.Ad, x.BransId }).FirstOrDefaultAsync(ct) is { } d
@@ -105,7 +111,7 @@ public static class DemoEndpointleri
             .. SenaryoIdleri.Hastalar
                 .Select(id => hastalar.FirstOrDefault(h => h.Id == id))
                 .OfType<Domain.Varliklar.Hasta>()
-                .Select(h => new KimlikOgesi(h.Id, $"{h.Ad} {h.Soyad[..1]}.",
+                .Select(h => new KimlikOgesi(h.Id, AdGosterimi.Kisa(h.Ad, h.Soyad),
                     $"{IstanbulSaati.Yas(h.DogumTarihi, simdi)} · {h.Cinsiyet}")),
         ];
     }

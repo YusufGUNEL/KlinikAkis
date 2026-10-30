@@ -1,0 +1,22 @@
+# Yerel Docker denemesi: uygulama + Postgres (yayında Neon). Parola ve anahtar repoda değil:
+# POSTGRES_PASSWORD ve Jwt__Key ortam değişkenlerini verip `docker compose up --build`.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: klinikakis
+      POSTGRES_USER: klinikakis
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD ortam değişkeni gerekli}
+    ports:
+      - "5432:5432"
+
+  app:
+    build: .
+    depends_on:
+      - db
+    environment:
+      Db__Provider: Postgres
+      ConnectionStrings__Default: Host=db;Database=klinikakis;Username=klinikakis;Password=${POSTGRES_PASSWORD}
+      Jwt__Key: ${Jwt__Key:?Jwt__Key ortam değişkeni gerekli (en az 32 karakter)}
+    ports:
+      - "8080:8080"

@@ -5,6 +5,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json.Serialization;
 using System.Text.Unicode;
 using KlinikAkis.Api.Endpointler;
+using KlinikAkis.Api.Gercekzaman;
 using KlinikAkis.Api.Kimlik;
 using KlinikAkis.Infrastructure.Seed;
 using KlinikAkis.Infrastructure.Veri;
@@ -19,6 +20,10 @@ CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
 CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Render gibi platformlar dinlenecek portu PORT değişkeniyle verir.
+if (Environment.GetEnvironmentVariable("PORT") is { Length: > 0 } port)
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 builder.Services.AddProblemDetails();
 // Scalar'da "Authorize" alanı çıksın: /demo/login'den alınan token yapıştırılıp korumalı uçlar denenebilir.
@@ -82,6 +87,17 @@ builder.Services.AddAuthentication().AddJwtBearer(o =>
         NameClaimType = DemoClaim.Ad,
         RoleClaimType = DemoClaim.Rol,
     };
+    // Tarayıcı WebSocket'te başlık gönderemez; token yalnızca hub yolunda sorgu parametresinden okunur.
+    o.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = baglam =>
+        {
+            var token = baglam.Request.Query["access_token"];
+            if (!string.IsNullOrEmpty(token) && baglam.HttpContext.Request.Path.StartsWithSegments(KlinikHub.Yol))
+                baglam.Token = token;
+            return Task.CompletedTask;
+        },
+    };
 });
 // Süre kontrolü varsayılan olarak DateTime.UtcNow kullanır; token'ı üreten saatle (TimeProvider) aynı saate bağlanır.
 builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
@@ -91,6 +107,9 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
         return exp is { } bitis && bitis > simdi - p.ClockSkew && (nbf is null || nbf <= simdi + p.ClockSkew);
     });
 builder.Services.AddAuthorizationBuilder().AddDemoPolitikalari();
+builder.Services.AddSignalR()
+    .AddJsonProtocol(o => o.PayloadSerializerOptions.Encoder = JavaScriptEncoder.Create(UnicodeRanges.All));
+builder.Services.AddSingleton<IOlayYayinci, OlayYayinci>();
 
 var app = builder.Build();
 
@@ -99,10 +118,18 @@ if (geciciAnahtar)
 
 // Şema EnsureCreated ile kurulur, veritabanı boşsa seed yüklenir (SPEC §5.3; migration yok).
 using (var kapsam = app.Services.CreateScope())
-    await kapsam.ServiceProvider.GetRequiredService<DemoSifirlayici>().HazirlaAsync();
+    await kapsam.ServiceProvider.GetRequiredService<DemoSifirlayici>()
+        .HazirlaAsync(app.Configuration.GetValue<bool>("Demo:SemaYenidenKur"));
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+// Yayında Angular derlemesi wwwroot'tan aynı origin'de sunulur (CORS gerekmez). Yerelde wwwroot yok: ng serve.
+var arayuzVar = app.Environment.WebRootPath is { } kok && File.Exists(Path.Combine(kok, "index.html"));
+if (arayuzVar)
+{
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+}
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -126,7 +153,17 @@ api.MapGet("/health", async Task<Results<Ok<SaglikYaniti>, JsonHttpResult<Saglik
 
 api.MapDemoEndpointleri()
     .MapBransSlotEndpointleri()
-    .MapHastaEndpointleri();
+    .MapHastaEndpointleri()
+    .MapRandevuEndpointleri();
+
+app.MapHub<KlinikHub>(KlinikHub.Yol).RequireAuthorization();
+
+if (arayuzVar)
+{
+    // Bilinmeyen /api yolu 404 kalsın; geri kalan her şey Angular rotasıdır (/doktor, /tv/... yenilenince).
+    app.MapFallback("/api/{**yol}", () => TypedResults.NotFound());
+    app.MapFallbackToFile("index.html");
+}
 
 app.Run();
 

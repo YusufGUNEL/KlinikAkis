@@ -1,0 +1,23 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/.angular/
+**/*.db
+**/*.db-shm
+**/*.db-wal
+src/KlinikAkis.Api/wwwroot/
+src/web/src/app/lisans.ts
+tests/
+docs/
+_calisma/
+.claude/
+.git/
+.vs/
+.vscode/
+.idea/
+# Render secret file'ları build bağlamının köküne kopyalar; imaja COPY ile girmesin.
+.primeui-license
+src/web/.primeui-license
+.env
+.env.*

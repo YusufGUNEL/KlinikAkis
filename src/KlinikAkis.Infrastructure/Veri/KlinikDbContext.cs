@@ -71,7 +71,11 @@ public sealed class KlinikDbContext(DbContextOptions<KlinikDbContext> options) :
             e.HasOne(x => x.Hasta).WithMany().HasForeignKey(x => x.HastaId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Hekim).WithMany().HasForeignKey(x => x.HekimId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Slot).WithMany().HasForeignKey(x => x.SlotId).OnDelete(DeleteBehavior.Restrict);
-            e.HasIndex(x => x.SlotId).IsUnique();
+            // Bir slotta en fazla bir etkin randevu; iptal edilen randevu slotu bırakır (yeniden alınabilir).
+            // Filtre SQLite ve Postgres'te aynı yazılır; enum metin olarak saklanıyor.
+            e.HasIndex(x => x.SlotId).IsUnique().HasFilter("\"Durum\" <> 'Iptal'");
+            // Durum yalnızca durum makinesiyle değişir; eşzamanlı iki geçişten ikincisi reddedilir (oku-kontrol-yaz).
+            e.Property(x => x.Durum).IsConcurrencyToken();
             e.HasOne<OnAnamnez>().WithMany().HasForeignKey(x => x.OnAnamnezId).OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -79,6 +83,7 @@ public sealed class KlinikDbContext(DbContextOptions<KlinikDbContext> options) :
         {
             e.HasOne<Randevu>().WithOne().HasForeignKey<Kabul>(x => x.RandevuId).OnDelete(DeleteBehavior.Restrict);
             e.Property(x => x.TakipNo).HasMaxLength(20);
+            e.HasIndex(x => x.TakipNo).IsUnique();
         });
 
         model.Entity<OnAnamnez>(e =>

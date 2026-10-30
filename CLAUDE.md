@@ -39,7 +39,7 @@ Her oturumun başında SPEC.md'yi oku. SPEC ile çelişen bir şey yapmadan önc
 - API anahtarı ve bağlantı dizesi asla repoya girmez (ortam değişkeni / user-secrets).
 - Türkçe yerel ayar (SPEC §10.5): `lang="tr"`, `29.10.2026`, ondalık virgül; Angular `uppercase`
   pipe yerine `trUpper`; sunucu `InvariantCulture`, Türkçe eşleşme yalnızca `TurkceMetin` içinde.
-- Zamanlar UTC `DateTime`; "bugün" Europe/Istanbul'a göre. Docker imajı Debian tabanlı.
+- Zamanlar UTC `DateTime`; "bugün" Europe/Istanbul'a göre. Docker imajı Ubuntu `aspnet:10.0-noble` (ICU + tzdata; Alpine değil — .NET 10'da Debian imajı yok).
 - Claude API kullanırken model kimliğini ve C# SDK'nın `IChatClient` desteğini önce `claude-api`
   skill'i / resmi dokümandan doğrula; hafızadan yazma.
 

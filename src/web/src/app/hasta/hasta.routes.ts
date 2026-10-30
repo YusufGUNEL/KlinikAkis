@@ -8,6 +8,11 @@ export const hastaRotalari: Routes = [
     component: HastaKabugu,
     children: [
       { path: '', loadComponent: () => import('./hasta-ana').then((m) => m.HastaAna), title: 'Hasta · KlinikAkış' },
+      {
+        path: 'randevu-al',
+        loadComponent: () => import('./randevu-al').then((m) => m.RandevuAl),
+        title: 'Randevu al · KlinikAkış',
+      },
     ],
   },
 ];

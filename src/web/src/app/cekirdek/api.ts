@@ -61,3 +61,47 @@ export type RandevuDurumu =
   | 'Gelmedi';
 
 export type AiKaynak = 'Llm' | 'Yedek' | 'Kural';
+
+export type RandevuEylemi = 'Kabul' | 'Cagir' | 'Basla' | 'Kapat' | 'Iptal' | 'Gelmedi';
+
+export interface SlotOgesi {
+  id: string;
+  baslangic: string;
+  sureDk: number;
+  hekimId: string;
+  hekimAd: string;
+  oda: string;
+}
+
+/** GET /hasta/me/randevular satırı. */
+export interface HastaRandevusu {
+  id: string;
+  baslangic: string;
+  siraNo: string;
+  durum: RandevuDurumu;
+  bransAd: string;
+  hekimAd: string;
+  oda: string;
+}
+
+/** GET /randevular satırı. hastaAd doktora "Ayşe K.", kabule maskeli "A*** K***" gelir (sunucuda). */
+export interface RandevuSatiri {
+  id: string;
+  baslangic: string;
+  siraNo: string;
+  durum: RandevuDurumu;
+  hastaId: string;
+  hastaAd: string;
+  bransAd: string;
+  hekimAd: string;
+  oda: string;
+  acikRizaAlindi: boolean;
+  takipNo: string | null;
+  izinliEylemler: RandevuEylemi[];
+}
+
+/** SignalR olayı: yalnızca {tur, id}; istemci ilgili REST'i yeniden çeker (SPEC §8). */
+export interface Olay {
+  tur: string;
+  id: string | null;
+}

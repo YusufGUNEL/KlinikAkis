@@ -31,10 +31,14 @@ public static class DemoRol
 /// <summary>Rol başına yetki politikası; politika adı rol adıyla aynıdır.</summary>
 public static class DemoPolitika
 {
+    /// <summary>Doktor ya da kabul: randevu listesi ve durum geçişleri (hangi eylemi kimin yapacağı uçta ayrıca denetlenir).</summary>
+    public const string Personel = "personel";
+
     public static AuthorizationBuilder AddDemoPolitikalari(this AuthorizationBuilder yetki)
     {
         foreach (var rol in DemoRol.Hepsi)
             yetki.AddPolicy(rol, p => p.RequireClaim(DemoClaim.Rol, rol));
+        yetki.AddPolicy(Personel, p => p.RequireClaim(DemoClaim.Rol, DemoRol.Doktor, DemoRol.Kabul));
         return yetki;
     }
 }
