@@ -7,6 +7,7 @@ using System.Text.Unicode;
 using KlinikAkis.Api.Endpointler;
 using KlinikAkis.Api.Gercekzaman;
 using KlinikAkis.Api.Kimlik;
+using KlinikAkis.Infrastructure.Ai;
 using KlinikAkis.Infrastructure.Seed;
 using KlinikAkis.Infrastructure.Veri;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -110,9 +111,13 @@ builder.Services.AddAuthorizationBuilder().AddDemoPolitikalari();
 builder.Services.AddSignalR()
     .AddJsonProtocol(o => o.PayloadSerializerOptions.Encoder = JavaScriptEncoder.Create(UnicodeRanges.All));
 builder.Services.AddSingleton<IOlayYayinci, OlayYayinci>();
+// Her LLM çağrısı tek AiHatti üzerinden (SPEC §9.1). AI:Provider yoksa Fake: demo ağsız ve ücretsiz çalışır.
+builder.Services.AddKlinikAi();
 
 var app = builder.Build();
 
+if (!AiKurulumu.Destekleniyor(app.Configuration["AI:Provider"]))
+    app.Logger.LogWarning("AI:Provider '{Saglayici}' henüz desteklenmiyor; Fake sağlayıcı kullanılıyor.", app.Configuration["AI:Provider"]);
 if (geciciAnahtar)
     app.Logger.LogWarning("Jwt:Key tanımlı değil; geçici anahtar üretildi. Kalıcı anahtar için: dotnet user-secrets set \"Jwt:Key\" <en az 32 karakter>");
 
@@ -154,7 +159,8 @@ api.MapGet("/health", async Task<Results<Ok<SaglikYaniti>, JsonHttpResult<Saglik
 api.MapDemoEndpointleri()
     .MapBransSlotEndpointleri()
     .MapHastaEndpointleri()
-    .MapRandevuEndpointleri();
+    .MapRandevuEndpointleri()
+    .MapOnAnamnezEndpointleri();
 
 app.MapHub<KlinikHub>(KlinikHub.Yol).RequireAuthorization();
 

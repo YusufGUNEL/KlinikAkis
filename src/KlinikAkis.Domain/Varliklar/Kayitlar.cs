@@ -161,6 +161,8 @@ public sealed class AiAuditLog
     public Guid Id { get; set; }
     public DateTime Zaman { get; set; }
     public AiOzellik Ozellik { get; set; }
+    /// <summary>"Modele giden veri" paneli (GET /ai/denetim?hastaId=) hastaya göre süzer; modele gitmez.</summary>
+    public Guid? HastaId { get; set; }
     public string Saglayici { get; set; } = "";
     public string Model { get; set; } = "";
     public string IstemSurumu { get; set; } = "";

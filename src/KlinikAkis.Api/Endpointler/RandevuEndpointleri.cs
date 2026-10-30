@@ -61,12 +61,26 @@ public static class RandevuEndpointleri
         if (slot.Dolu || slot.Baslangic <= simdi)
             return SaatDoldu();
 
-        if (istek.OnAnamnezId is { } onAnamnezId &&
-            !await db.OnAnamnezler.AnyAsync(o => o.Id == onAnamnezId && o.HastaId == hastaId, ct))
-            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
-            {
-                ["onAnamnezId"] = ["Ön anamnez bu hastaya ait değil."],
-            });
+        OnAnamnez? onAnamnez = null;
+        if (istek.OnAnamnezId is { } onAnamnezId)
+        {
+            onAnamnez = await db.OnAnamnezler.FirstOrDefaultAsync(o => o.Id == onAnamnezId && o.HastaId == hastaId, ct);
+            if (onAnamnez is null)
+                return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["onAnamnezId"] = ["Ön anamnez bu hastaya ait değil."],
+                });
+            // Kırmızı bayrakta akış sunucuda da durur: arayüz atlatılsa bile randevu verilmez, 112 yönlendirmesi geçerli.
+            if (onAnamnez.Durum == OnAnamnezDurumu.KirmiziBayrak)
+                return TypedResults.Problem(detail: KirmiziBayrakMotoru.AcilMesaji, statusCode: StatusCodes.Status409Conflict);
+            // Yarım sohbetle randevu alınıp tarama adımı sonradan atlanmasın; bir ön anamnez tek randevuya bağlanır.
+            if (onAnamnez.Durum == OnAnamnezDurumu.Sohbette)
+                return TypedResults.Problem(detail: "Şikayet sohbeti tamamlanmadan randevu alınamaz.",
+                    statusCode: StatusCodes.Status409Conflict);
+            if (onAnamnez.RandevuId is not null)
+                return TypedResults.Problem(detail: "Bu şikayet kaydıyla zaten randevu alındı.",
+                    statusCode: StatusCodes.Status409Conflict);
+        }
 
         var hekim = slot.Hekim!;
         var (gunBasi, gunSonu) = IstanbulSaati.GunAraligi(IstanbulSaati.Bugun(slot.Baslangic));
@@ -84,6 +98,7 @@ public static class RandevuEndpointleri
             OnAnamnezId = istek.OnAnamnezId,
         };
         slot.Dolu = true;
+        onAnamnez?.RandevuId = randevu.Id;
         db.Randevular.Add(randevu);
         try
         {

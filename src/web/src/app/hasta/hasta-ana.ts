@@ -21,7 +21,7 @@ import { simdiSinyali } from '../ortak/simdi';
       <app-baglanti-gostergesi [durum]="hub.durum()" />
     </div>
 
-    <a pButton routerLink="randevu-al" class="mt-5 min-h-12 w-full justify-center text-lg">Randevu al</a>
+    <a pButton routerLink="sikayet" class="mt-5 min-h-12 w-full justify-center text-lg">Randevu al</a>
 
     <section class="mt-6" aria-labelledby="randevular-baslik">
       <h2 id="randevular-baslik" class="text-lg font-semibold text-slate-900">Randevularım</h2>

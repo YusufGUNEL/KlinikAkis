@@ -29,6 +29,14 @@ describe('hataMesaji', () => {
     expect(hataMesaji(hata)).toBe("Randevu 'Planlandı' durumundayken çağrılamaz.");
   });
 
+  it('ValidationProblem için alan sözlüğündeki Türkçe mesajı verir', () => {
+    const hata = new HttpErrorResponse({
+      status: 400,
+      error: { title: 'One or more validation errors occurred.', errors: { cevap: ['Bir seçenek seçin ya da kısaca yazın.'] } },
+    });
+    expect(hataMesaji(hata)).toBe('Bir seçenek seçin ya da kısaca yazın.');
+  });
+
   it('detaysız 403 için yetki mesajı verir', () => {
     expect(hataMesaji(new HttpErrorResponse({ status: 403 }))).toContain('yetkiniz yok');
   });

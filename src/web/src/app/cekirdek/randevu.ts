@@ -17,8 +17,8 @@ const YOLLAR: Record<RandevuEylemi, string> = {
 export class RandevuIslemleri {
   private readonly http = inject(HttpClient);
 
-  al(slotId: string): Promise<HastaRandevusu> {
-    return firstValueFrom(this.http.post<HastaRandevusu>('/api/randevular', { slotId }));
+  al(slotId: string, onAnamnezId: string | null = null): Promise<HastaRandevusu> {
+    return firstValueFrom(this.http.post<HastaRandevusu>('/api/randevular', { slotId, onAnamnezId }));
   }
 
   uygula(randevuId: string, eylem: RandevuEylemi): Promise<RandevuSatiri> {
@@ -29,8 +29,11 @@ export class RandevuIslemleri {
 /** ProblemDetails.detail (sunucudaki Türkçe mesaj) ya da durum koduna göre genel mesaj. */
 export function hataMesaji(hata: unknown): string {
   if (hata instanceof HttpErrorResponse) {
-    const detay = (hata.error as { detail?: unknown } | null)?.detail;
-    if (typeof detay === 'string' && detay) return detay;
+    const govde = hata.error as { detail?: unknown; errors?: Record<string, unknown> } | null;
+    if (typeof govde?.detail === 'string' && govde.detail) return govde.detail;
+    // ValidationProblem: Türkçe mesaj alan sözlüğünde (title İngilizce, detail boş).
+    const ilk = Object.values(govde?.errors ?? {}).flat()[0];
+    if (typeof ilk === 'string' && ilk) return ilk;
     if (hata.status === 401 || hata.status === 403) return 'Bu işlem için yetkiniz yok ya da oturumun süresi doldu.';
   }
   return 'İşlem yapılamadı. Bağlantıyı kontrol edip yeniden deneyin.';

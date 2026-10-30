@@ -105,3 +105,39 @@ export interface Olay {
   tur: string;
   id: string | null;
 }
+
+/** Soru ağacı adımı (sunucuda sabit; LLM soru üretmez — SPEC §9.4). */
+export interface SohbetSorusu {
+  adim: number;
+  metin: string;
+  secenekler: string[];
+  cokluSecim: boolean;
+  atlanabilir: boolean;
+}
+
+export interface KirmiziBayrak {
+  kural: string;
+  mesaj: string;
+}
+
+export interface OnAnamnezBaslatYaniti {
+  onAnamnezId: string;
+  ilkSoru: SohbetSorusu;
+  toplamAdim: number;
+}
+
+export interface CevapYaniti {
+  sonrakiSoru: SohbetSorusu | null;
+  adim: number;
+  toplamAdim: number;
+  kirmiziBayrak: KirmiziBayrak | null;
+}
+
+export type OnAnamnezDurumu = 'Sohbette' | 'KirmiziBayrak' | 'Taslak' | 'Onaylandi' | 'Duzenlendi' | 'Reddedildi';
+
+export interface OzetYaniti {
+  onAnamnezId: string;
+  durum: OnAnamnezDurumu;
+  kaynak: AiKaynak | null;
+  kirmiziBayrak: KirmiziBayrak | null;
+}

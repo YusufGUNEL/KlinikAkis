@@ -153,7 +153,7 @@ gösterilir. `DateTimeOffset` kullanılmaz (SQLite sağlayıcısı sıralayamaz)
 | **TahlilSonucu** | Id, HastaId, TahlilTanimiId, Deger (decimal), Zaman, Isaret (kodla hesaplanır: `Normal`, `Yuksek`, `Dusuk`, `KritikYuksek`, `KritikDusuk`), AiAciklamaTaslak, YayinlananAciklama?, HastayaYayinlandi (bool + zaman + hekim) |
 | **Epikriz** (artı) | Id, MuayeneId, AiTaslak, SonMetin?, Kaynak, Durum (`Taslak`, `Onaylandi`, `Reddedildi`), OnaylayanHekimId |
 | **OutboxMesaji** (artı) | Id, PaketTipi (101 Hasta Kayıt, 103 Muayene, 105 Lab Sonuç), HastaTakmaAdi, PayloadJson, Durum (`Bekliyor`, `Gonderildi`, `IsKuraliHatasi`), Deneme, Zaman, Hata |
-| **AiAuditLog** | Id, Zaman, Ozellik (`OnAnamnez`, `TahlilAciklama`, `Epikriz`), Saglayici (`Anthropic`/`Ollama`/`Fake`/`Kural`), Model, IstemSurumu, MaskeliGirdi (metin), GirdiHash (SHA-256), CiktiJson, GecikmeMs, Basarili, YedegeDustu (bool), Neden? ("zaman aşımı", "geçersiz bölüm", "kota", kural adı) |
+| **AiAuditLog** | Id, Zaman, Ozellik (`OnAnamnez`, `TahlilAciklama`, `Epikriz`), HastaId? (panel süzgeci; modele gitmez), Saglayici (`Anthropic`/`Ollama`/`Fake`/`Kural`), Model, IstemSurumu, MaskeliGirdi (metin), GirdiHash (SHA-256), CiktiJson, GecikmeMs, Basarili, YedegeDustu (bool), Neden? ("zaman aşımı", "geçersiz bölüm", "kota", kural adı) |
 | **ErisimKaydi** | Id, Zaman, KullaniciRol, KullaniciAd, HastaId, Eylem ("Görüntüledi", "Onayladı", "Düzenledi", "Reddetti", "Yayınladı") |
 
 **SQLite notu:** SQLite sağlayıcısı `decimal` üzerinde sıralama/karşılaştırma yapamaz. `OnModelCreating`
@@ -296,23 +296,27 @@ modele yalnızca maskeli metin gider. Her dal (kural, kota, yedek, başarı) den
 - **Telefon:** `+90 5xx…`, `0 5xx…`, `5xx…` (boşluk/tire/parantezli) → `[TELEFON]`. **E-posta** → `[EPOSTA]`.
 - **Ad/soyad:** kayıttaki ad ve soyad, **Türkçe ek toleransıyla**: büyük/küçük harf duyarsız (tr-TR),
   kesme işaretli/kesmesiz ekler ("Ayşe'nin", "Ayşenin", "AYŞE'YE", "Kaya'ya") → `[AD]` / `[SOYAD]`.
-  Desen: sözcük sınırı + ad + isteğe bağlı `['’]?` + en fazla 6 harf ek. Kayıtta olmayan isimler
-  maskelenmez (§14 Sınırlar).
+  Desen: sözcük sınırı + ad + ek. Kesmeli ekte en fazla 6 harf; kesmesiz ekte **kapalı ek listesi**
+  (nin/nın/ye/ya/de/den/le...), yoksa "Ayşegül" de "Ayşe" + "gül" sayılırdı. Ek maskeye dahildir:
+  "Ayşe'nin telefonu 0532 123 45 67" → "[AD] telefonu [TELEFON]". Karşılaştırma `TurkceMetin` ile
+  katlanmış biçimde (büyük/küçük ve Türkçe harf farkı yok). Kayıtta olmayan isimler maskelenmez (§14 Sınırlar).
 - Hasta Id → takma ad (`P-7F3A`, kayıtta sabit), yaş → aralık (`50-59`), doğum tarihi gönderilmez.
 - Maskeli metin AiAuditLog'a yazılır ve "modele giden veri" panelinde aynen gösterilir.
 
 ### 9.3 Kırmızı bayrak kuralları (`KirmiziBayrakMotoru`, Domain, LLM'den önce)
-Kurallar: Göğüs ağrısı + terleme/kola-çeneye yayılma · inme bulguları (yüzde kayma, konuşma bozukluğu,
+Kurallar: Göğüs ağrısı + terleme/kola-çeneye yayılma (`GogusAgrisiTerleme`) · yalnız göğüs ağrısı
+(`GogusAgrisi`; tarama adımındaki "Göğüs ağrısı" seçeneğiyle tutarlı, fazla tetiklemek güvenli taraf) · inme bulguları (yüzde kayma, konuşma bozukluğu,
 tek taraflı güçsüzlük) · ağır nefes darlığı · bilinç kaybı/bayılma · intihar/kendine zarar düşüncesi ·
 gebelik + kanama · 3 ay altı bebekte ateş.
 
 İki katmanlı kontrol:
 1. **Yapılandırılmış:** soru ağacında açık bir tarama adımı (çoklu seçim: "Göğüs ağrısı", "Nefes
-   darlığı", "Yüzde kayma / konuşma bozukluğu", "Bayılma", "Kendime zarar verme düşüncesi", "Hiçbiri").
+   darlığı", "Yüzümde kayma / konuşma bozukluğu", "Bayılma", "Kendime zarar verme düşüncesi", "Hiçbiri").
 2. **Serbest metin:** `TurkceMetin.Normalize` (tr-TR küçük harf, kesme işaretlerini birleştir, boşluk
-   sadeleştir) + **kök listeleri** ("göğs", "göğüs", "terl", "kola yayıl", "nefes alamı", "bayıl",
+   sadeleştir) + ASCII katlama (Türkçe klavyesiz "gogsum agriyor" da yakalanır) + **kök listeleri** ("göğs", "göğüs", "terl", "kola yayıl", "nefes alamı", "bayıl",
    "kendimi öldür", "intihar"...). Kök eşleşmesi çekimleri yakalar ("göğsüm", "terliyorum").
-- Her `cevap` adımında çalışır → bant anında görünür. Olumsuzlama ("göğüs ağrım yok") ayırt edilmez:
+- Her `cevap` adımında sohbetin **tüm cevaplarına birlikte** bakar (belirtiler farklı adımlarda yazılsa da
+  birleşir) → bant anında görünür. Olumsuzlama ("göğüs ağrım yok") ayırt edilmez:
   **fazla tetiklemek güvenli taraftır** (bilinçli karar, README'de yazar).
 - Tetiklenirse: LLM çağrılmaz, randevu akışı durur, ekranda "112'yi arayın / en yakın acile başvurun"
   (`tel:112` bağlantısı), OnAnamnez.Durum = `KirmiziBayrak`, denetim kaydına kural adı yazılır.
@@ -716,7 +720,10 @@ Son deploy, `/health` ısıtma, §1.3 kontrol listesi, iki cihazda 3 prova (mobi
 ## 14. Sınırlar (README'ye aynen girer)
 - Gerçek kimlik doğrulama yok; demo JWT rol seçimiyle verilir.
 - Maskeleme yalnızca kayıttaki ad/soyadı ve kalıplı kimlik verilerini yakalar; metindeki başka
-  kişi adları ve adresler maskelenmez. Üretimde NER tabanlı ek katman gerekir.
+  kişi adları ve adresler maskelenmez. Üretimde NER tabanlı ek katman gerekir. Ad aynı zamanda
+  sözcükse ("Can", "Deniz") o sözcük de maskelenir (fazla maskeleme güvenli taraftır).
+- Kırmızı bayrak sohbet başınadır: ön anamnezsiz doğrudan randevu ekranı (Aşama 3 yolu) açık kalır;
+  bayraklı sohbetin kendisiyle randevu alınamaz.
 - Kırmızı bayrak listesi kapsayıcı değildir ve bilinçli olarak fazla tetikler; olumsuzlamayı ayırt etmez.
 - Referans aralıkları örnektir; laboratuvara göre değişir.
 - e-Nabız ve takip numaraları simülasyondur; gerçek servise bağlanılmaz.

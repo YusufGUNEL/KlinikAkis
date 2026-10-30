@@ -1,6 +1,6 @@
 import { httpResource } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { BransOgesi, SlotOgesi } from '../cekirdek/api';
 import { gunEtiketi, hataMesaji, RandevuIslemleri } from '../cekirdek/randevu';
@@ -8,8 +8,8 @@ import { DurumKutusu } from '../ortak/durum-kutusu';
 import { simdiSinyali } from '../ortak/simdi';
 
 /**
- * Randevu alma: bölüm seç → saat seç → onayla. Bölüm şimdilik elle seçilir; Aşama 5'te şikayet sohbetinin
- * önerdiği bölüm buraya ön seçili gelir.
+ * Randevu alma: bölüm seç → saat seç → onayla. Şikayet sohbetinden gelindiyse (?onAnamnez=) randevu o ön
+ * anamneze bağlanır. Bölüm şimdilik elle seçilir; Aşama 5'te sohbetin önerdiği bölüm ön seçili gelir.
  */
 @Component({
   selector: 'app-randevu-al',
@@ -89,6 +89,7 @@ import { simdiSinyali } from '../ortak/simdi';
 export class RandevuAl {
   private readonly islemler = inject(RandevuIslemleri);
   private readonly router = inject(Router);
+  private readonly onAnamnezId = inject(ActivatedRoute).snapshot.queryParamMap.get('onAnamnez');
 
   private readonly simdi = simdiSinyali();
   protected readonly brans = signal<BransOgesi | null>(null);
@@ -121,7 +122,7 @@ export class RandevuAl {
     this.gonderiliyor.set(true);
     this.hata.set('');
     try {
-      await this.islemler.al(slot.id);
+      await this.islemler.al(slot.id, this.onAnamnezId);
       await this.router.navigate(['/hasta']);
     } catch (e) {
       // 409: saat bu arada doldu; liste yenilenir, hasta başka saat seçer.
