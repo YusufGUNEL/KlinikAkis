@@ -39,9 +39,12 @@ public sealed class FakeChatClient : IChatClient
 
         var kullaniciMetni = string.Join("\n", messages.Where(m => m.Role == ChatRole.User).Select(m => m.Text));
         var json = Yanitla?.Invoke(kullaniciMetni)
-            ?? (options?.ResponseFormat is ChatResponseFormatJson { SchemaName: TahlilAciklamaYaniti.SemaAdi }
-                ? TahlilYaniti(kullaniciMetni)
-                : HazirYanit(kullaniciMetni));
+            ?? (options?.ResponseFormat as ChatResponseFormatJson)?.SchemaName switch
+            {
+                TahlilAciklamaYaniti.SemaAdi => TahlilYaniti(kullaniciMetni),
+                EpikrizYaniti.SemaAdi => EpikrizYanitiUret(kullaniciMetni),
+                _ => HazirYanit(kullaniciMetni),
+            };
         return new ChatResponse(new ChatMessage(ChatRole.Assistant, json)) { ModelId = ModelAdi };
     }
 
@@ -76,6 +79,33 @@ public sealed class FakeChatClient : IChatClient
                 ? "Doktorunuz sizinle iletişime geçecek."
                 : "Bu sonucu bir sonraki görüşmede doktorunuzla konuşun.");
         return JsonSerializer.Serialize(new { aciklama }, Json);
+    }
+
+    /// <summary>Epikriz: istemdeki onaylı ön anamnez ve hekim notu bloklarından; yeni sayı ya da tanı eklemez.</summary>
+    private static string EpikrizYanitiUret(string metin)
+    {
+        string Blok(string etiket)
+        {
+            var bas = metin.IndexOf($"<{etiket}>", StringComparison.Ordinal);
+            var son = metin.IndexOf($"</{etiket}>", StringComparison.Ordinal);
+            return bas < 0 || son < bas ? "" : metin[(bas + etiket.Length + 2)..son].Trim();
+        }
+        var anamnez = Blok("on_anamnez");
+        var not = Blok("hekim_notu");
+        var tahlilYok = metin.Contains("\n- yok\n", StringComparison.Ordinal);
+        var disiVar = metin.Contains("▲", StringComparison.Ordinal) || metin.Contains("▼", StringComparison.Ordinal)
+            || metin.Contains("‼", StringComparison.Ordinal);
+        object yanit = new
+        {
+            oyku = anamnez.StartsWith("hekim onaylı ön anamnez yok", StringComparison.Ordinal)
+                ? "Hasta poliklinik başvurusu; hekim onaylı ön anamnez yok."
+                : $"Başvuru öyküsü: {anamnez}",
+            degerlendirme = (not.StartsWith("hekim notu yok", StringComparison.Ordinal) ? "Muayene bulgusu girilmedi. " : $"Muayene: {not} ")
+                + (tahlilYok ? "Tahlil sonucu yok." : disiVar ? "Referans dışı tahlil değerleri mevcut (işaretler kodla verildi)." : "Tahliller referans aralığında.")
+                + " Tanı hekim tarafından belirlenecek.",
+            plan = "Plan hekim tarafından belirlenecek.",
+        };
+        return JsonSerializer.Serialize(yanit, Json);
     }
 
     private static string HazirYanit(string metin)

@@ -127,7 +127,7 @@ public static class TahlilEndpointleri
         var testler = string.Join(", ", sonuclar.Select(s => s.TahlilTanimi!.Ad));
         Erisim(sonuclar.Count == 1 ? $"Tahlil sonucunu hastaya yayınladı: {testler}" : $"Tahlil sonuçlarını hastaya yayınladı: {testler}");
         if (kritikler.Count > 0)
-            Erisim($"Kritik değer ({string.Join(", ", kritikler.Select(k => $"{k.TahlilTanimi!.Ad} {DoktorEtiketi(k.Isaret)}"))}): " +
+            Erisim($"Kritik değer ({string.Join(", ", kritikler.Select(k => $"{k.TahlilTanimi!.Ad} {TahlilGirdisi.DoktorEtiketi(k.Isaret)}"))}): " +
                 (istek.Bilgilendirme == BilgilendirmeSecimi.TelefonlaBilgilendirildi
                     ? "hasta telefonla bilgilendirildi"
                     : "hasta bilgilendirilecek"));
@@ -183,16 +183,6 @@ public static class TahlilEndpointleri
             : await db.Hekimler.AsNoTracking().Where(h => liste.Contains(h.Id))
                 .ToDictionaryAsync(h => h.Id, h => h.Unvan + " " + h.Ad, ct);
     }
-
-    /// <summary>Doktor etiketi (SPEC §10.1): erişim kaydı metninde kullanılır.</summary>
-    private static string DoktorEtiketi(Isaret i) => i switch
-    {
-        Isaret.KritikYuksek => "‼ KY",
-        Isaret.KritikDusuk => "‼ KD",
-        Isaret.Yuksek => "▲ Y",
-        Isaret.Dusuk => "▼ D",
-        _ => "✓",
-    };
 
     private static ValidationProblem Gecersiz(string alan, string mesaj) =>
         TypedResults.ValidationProblem(new Dictionary<string, string[]> { [alan] = [mesaj] });

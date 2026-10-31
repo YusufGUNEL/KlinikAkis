@@ -151,7 +151,7 @@ gösterilir. `DateTimeOffset` kullanılmaz (SQLite sağlayıcısı sıralayamaz)
 | **Muayene** | Id, RandevuId, BaslangicZamani, HekimNotu, Tanilar (ICD-10 kod listesi, artı aşamada), Durum (`Acik`, `Kapali`) |
 | **TahlilTanimi** | Id, Ad, HastaDostuAd ("Şeker ortalaması"), LoincKodu, Birim, AltSinir, UstSinir, CinsiyeteGore (K/E ayrı aralık), KritikAlt?, KritikUst?, Not ("örnek aralık, laboratuvara göre değişir"), Ondalik (gösterim basamağı: "7,0", "128") |
 | **TahlilSonucu** | Id, HastaId, TahlilTanimiId, Deger (decimal), Zaman, Isaret (kodla hesaplanır: `Normal`, `Yuksek`, `Dusuk`, `KritikYuksek`, `KritikDusuk`), AiAciklamaTaslak, AciklamaKaynak? (`Llm`/`Yedek`), AiModel?, AiZamani?, KotaDoldu (kart başlığı, §10.2), YayinlananAciklama?, HastayaYayinlandi (bool + zaman + hekim) |
-| **Epikriz** (artı) | Id, MuayeneId, AiTaslak, SonMetin?, Kaynak, Durum (`Taslak`, `Onaylandi`, `Reddedildi`), OnaylayanHekimId |
+| **Epikriz** (artı) | Id, MuayeneId, AiTaslak (yapılandırılmış JSON: model yazar öykü/değerlendirme/plan; alerji ve tahlil satırları kodla eklenir), SonMetin? (hekimin düzenlediği öykü/değerlendirme/plan metni; alerji ve tahlil satırları düzenlenmez, AiTaslak'tan basılır), Kaynak, Durum (`Taslak`, `Onaylandi`, `Reddedildi`), OnaylayanHekimId, OnayZamani?, AiModel?, AiZamani, KotaDoldu (kart başlığı, §10.2) |
 | **OutboxMesaji** (artı) | Id, PaketTipi (101 Hasta Kayıt, 103 Muayene, 105 Lab Sonuç), HastaTakmaAdi, PayloadJson, Durum (`Bekliyor`, `Gonderildi`, `IsKuraliHatasi`), Deneme, Zaman, Hata |
 | **AiAuditLog** | Id, Zaman, Ozellik (`OnAnamnez`, `TahlilAciklama`, `Epikriz`), HastaId? (panel süzgeci; modele gitmez), Saglayici (`Gemini`/`Ollama`/`Fake`/`Kural`), Model, IstemSurumu, MaskeliGirdi (metin), GirdiHash (SHA-256), CiktiJson, GecikmeMs, Basarili, YedegeDustu (bool), Neden? ("zaman aşımı", "geçersiz bölüm", "kota", kural adı) |
 | **ErisimKaydi** | Id, Zaman, KullaniciRol, KullaniciAd, HastaId, Eylem (tam cümle: "Hasta kaydını görüntüledi", "Ön anamnezi onayladı / düzenledi / reddetti", sonraki aşamalarda "… yayınladı") |
@@ -240,14 +240,15 @@ Tümü `/api` altında, JSON. Hata formatı ProblemDetails. Rol kontrolü JWT cl
 | GET | `/hastalar/{id}/ozet` | doktor | Hasta bandı + sol sütun (erişim kaydı yazar) |
 | GET | `/onanamnez/{id}` | doktor | Kart verisi |
 | POST | `/onanamnez/{id}/karar` | doktor | `onayla` / `duzenle` (metinle) / `reddet` |
-| PUT | `/muayeneler/{id}/not` | doktor | Hekim notu kaydet |
+| GET | `/muayeneler/{id}` | doktor | (artı) Muayene durumu, hekim notu, son epikriz kartı (Epikriz sekmesi) |
+| PUT | `/muayeneler/{id}/not` | doktor | Hekim notu kaydet (yalnız randevunun hekimi, açık muayene, ≤ 2000 karakter) |
 | GET | `/hastalar/{id}/tahliller` | doktor | Sonuçlar + işaret + trend serisi |
 | POST | `/tahliller/{id}/aciklama` | doktor | AI açıklama taslağı üret |
 | POST | `/tahliller/yayinla` | doktor | `{sonuclar: [{sonucId, aciklama}], bilgilendirme?}` (`TelefonlaBilgilendirildi` \| `Bilgilendirilecek`; kritik değer varsa zorunlu, §10.3); tek hasta; erişim kaydı + 105 outbox + `TahlilYayinlandi` |
 | GET | `/hasta/me/sonuclar` | hasta | **Yalnızca yayınlanmış** sonuçlar |
 | GET | `/ai/denetim?hastaId=` | doktor | "Modele giden veri" paneli |
 | GET | `/hastalar/{id}/erisim` | doktor | Erişim kaydı listesi |
-| POST | `/muayeneler/{id}/epikriz` | doktor | (artı) Epikriz taslağı |
+| POST | `/muayeneler/{id}/epikriz` | doktor | (artı) Epikriz taslağı (bekleyen taslak varsa model yeniden çağrılmaz, o döner) |
 | POST | `/epikriz/{id}/karar` | doktor | (artı) `onayla` / `duzenle` / `reddet` |
 | GET | `/outbox` | doktor, kabul | (artı) Gönderim kutusu |
 | POST | `/outbox/{id}/yeniden-dene` | doktor, kabul | (artı) |
@@ -365,6 +366,9 @@ SDK şemayı yerel olarak iletmiyorsa: şema istemde verilir, doğrulama zaten z
 
 ### 9.7 Sağlayıcılar ve istemler
 - `AI:Provider` = `Gemini` | `Ollama` | `Fake`; `AI:Model` (varsayılan `gemini-3.5-flash-lite`).
+  `AI:EpikrizModel` (isteğe bağlı; yoksa `AI:Model`): epikriz için daha güçlü model, istek başına
+  `ChatOptions.ModelId` ile. Ölçüm (31.10.2026, ücretsiz katman): `gemini-3.8-flash` 45-60 sn ya da 503,
+  `gemini-3.6-flash` ~16 sn, `gemini-3.5-flash-lite` ~1 sn; 15 sn zaman aşımına sığan varsayılan seçildi.
   Gemini, OpenAI uyumlu uçla (`https://generativelanguage.googleapis.com/v1beta/openai/`) bağlanır.
   Anahtar ortam değişkeninden / user-secrets'tan (`GEMINI_API_KEY`), asla repoda değil. Anahtar yoksa
   uyarı yazılır, Fake kullanılır (demo kırılmaz).
@@ -711,7 +715,7 @@ Zaman daralırsa sıra: Aşama 0-6 + 9 kesin; 7'nin ilk maddesi (epikriz); geri 
 - Hasta sonuç ekranı (taslak 3): aralık çubuğu, işaret etiketi (§10.1), trend, sabit uyarı. Test 8.
 
 ### 13.7 Artılar I — her biri ayrı durak
-(a) Epikriz taslağı (muayene + onaylı anamnez + tahlillerden; `AI:Model` ayarıyla daha güçlü model, ör. `gemini-3.8-flash`; onayla/düzenle/reddet).
+(a) Epikriz taslağı (muayene + onaylı anamnez + tahlillerden; varsayılan `AI:Model`, daha güçlü model isteğe bağlı `AI:EpikrizModel` ile — ölçüm §9.7; onayla/düzenle/reddet).
 (b) TV sıra ekranı (taslak 8; çağrı canlı; son 3 çağrı). (c) Outbox + `OutboxIsleyici` (§5.2, taslak 9).
 
 ### 13.8 Artılar II

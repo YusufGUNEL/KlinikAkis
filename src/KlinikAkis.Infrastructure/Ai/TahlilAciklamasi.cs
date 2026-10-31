@@ -43,6 +43,16 @@ public sealed record TahlilGirdisi(
     };
 
     public static bool Kritik(Isaret isaret) => isaret is Isaret.KritikYuksek or Isaret.KritikDusuk;
+
+    /// <summary>Doktor etiketi (SPEC §10.1 tek kaynak): erişim kaydı ve epikriz tahlil satırlarında kullanılır.</summary>
+    public static string DoktorEtiketi(Isaret isaret) => isaret switch
+    {
+        Isaret.KritikYuksek => "‼ KY",
+        Isaret.KritikDusuk => "‼ KD",
+        Isaret.Yuksek => "▲ Y",
+        Isaret.Dusuk => "▼ D",
+        _ => "✓",
+    };
 }
 
 /// <summary>LLM'den beklenen tek alan (SPEC §9.6): <c>{ "aciklama": "string" }</c>.</summary>
@@ -115,13 +125,16 @@ public static partial class TahlilAciklamaDogrulayici
     public static bool SayilarGirdide(string metin, TahlilGirdisi g)
     {
         decimal[] izinli = [g.Deger, g.Alt, g.Ust, .. g.Trend];
-        foreach (Match m in SayiDeseni().Matches(metin))
-        {
-            var d = decimal.Parse(m.Value.Replace(',', '.'), CultureInfo.InvariantCulture);
-            if (!izinli.Contains(d) && !(d is >= 1 and <= 3 && d == decimal.Truncate(d))) return false;
-        }
-        return true;
+        return SayilarIzinli(metin, izinli);
     }
+
+    /// <summary>Metindeki her sayı izinli listede ya da 1-3 arası tam sayı (adet) olmalı; epikriz de aynı kuralı kullanır.</summary>
+    public static bool SayilarIzinli(string metin, IReadOnlyCollection<decimal> izinli) =>
+        Sayilar(metin).All(d => izinli.Contains(d) || (d is >= 1 and <= 3 && d == decimal.Truncate(d)));
+
+    /// <summary>Metindeki sayılar (ondalık virgül ya da nokta); harfe bitişik rakamlar ("HbA1c") sayı sayılmaz.</summary>
+    public static IEnumerable<decimal> Sayilar(string metin) =>
+        SayiDeseni().Matches(metin).Select(m => decimal.Parse(m.Value.Replace(',', '.'), CultureInfo.InvariantCulture));
 
     [GeneratedRegex(@"(?<![\p{L}\d,.])\d+(?:[,.]\d+)?(?![\p{L}\d])")]
     private static partial Regex SayiDeseni();

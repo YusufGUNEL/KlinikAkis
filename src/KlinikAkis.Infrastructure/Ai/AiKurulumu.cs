@@ -9,7 +9,12 @@ namespace KlinikAkis.Infrastructure.Ai;
 
 /// <param name="Saglayici">Etkin sağlayıcı (<c>Gemini</c> | <c>Fake</c>); denetim kaydına yazılır.</param>
 /// <param name="Uyari">Yapılandırma istenenden farklı uygulandıysa (anahtar yok vb.) başlangıçta günlüğe yazılır.</param>
-public sealed record AiAyarlari(string Saglayici, string Model, int GunlukLimit, TimeSpan ZamanAsimi, string? Uyari = null)
+/// <param name="EpikrizModel">
+/// Epikriz için ayrı model (istek başına <c>ChatOptions.ModelId</c>); null ise <see cref="Model"/>. Varsayılan null:
+/// ücretsiz katmanda gemini-3.8-flash 45-60 sn sürdü / 503 verdi (ölçüm 31.10.2026), 15 sn zaman aşımına sığmadı.
+/// </param>
+public sealed record AiAyarlari(
+    string Saglayici, string Model, int GunlukLimit, TimeSpan ZamanAsimi, string? Uyari = null, string? EpikrizModel = null)
 {
     public const string Gemini = "Gemini";
     public const string VarsayilanGeminiModeli = "gemini-3.5-flash-lite";
@@ -20,7 +25,7 @@ public sealed record AiAyarlari(string Saglayici, string Model, int GunlukLimit,
 public static class AiKurulumu
 {
     /// <summary>
-    /// <c>AI:Provider</c> = <c>Gemini</c> | <c>Fake</c> (Ollama Aşama 10'da aynı OpenAI uyumlu yolla). Anahtar
+    /// <c>AI:Provider</c> = <c>Gemini</c> | <c>Fake</c>; epikriz modeli <c>AI:EpikrizModel</c> (Ollama Aşama 10'da aynı OpenAI uyumlu yolla). Anahtar
     /// <c>GEMINI_API_KEY</c> (user-secrets / ortam değişkeni). Anahtar yoksa ya da sağlayıcı tanınmıyorsa uygulama
     /// düşmez, Fake kullanılır (demo asla kırılmaz, SPEC §1.2); uyarıyı Program.cs yazar.
     /// </summary>
@@ -49,7 +54,8 @@ public static class AiKurulumu
             return string.IsNullOrWhiteSpace(anahtar)
                 ? Fake(limit, zamanAsimi, "AI:Provider=Gemini ama GEMINI_API_KEY tanımlı değil; Fake sağlayıcı kullanılıyor. " +
                     "Anahtar için: dotnet user-secrets set \"GEMINI_API_KEY\" <anahtar> --project src/KlinikAkis.Api")
-                : new AiAyarlari(AiAyarlari.Gemini, config["AI:Model"] ?? AiAyarlari.VarsayilanGeminiModeli, limit, zamanAsimi);
+                : new AiAyarlari(AiAyarlari.Gemini, config["AI:Model"] ?? AiAyarlari.VarsayilanGeminiModeli, limit, zamanAsimi,
+                    EpikrizModel: string.IsNullOrWhiteSpace(config["AI:EpikrizModel"]) ? null : config["AI:EpikrizModel"]);
 
         return Fake(limit, zamanAsimi, string.Equals(istenen, FakeChatClient.Saglayici, StringComparison.OrdinalIgnoreCase)
             ? null

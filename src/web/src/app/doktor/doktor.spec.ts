@@ -28,6 +28,7 @@ const satir = (durum: RandevuSatiri['durum'], izinliEylemler: RandevuSatiri['izi
   takipNo: 'SIM-000001',
   izinliEylemler,
   onAnamnezId: null,
+  muayeneId: null,
 });
 
 const detay = (durum: OnAnamnezDetayi['durum'], karar: OnAnamnezDetayi['karar'] = null): OnAnamnezDetayi => ({

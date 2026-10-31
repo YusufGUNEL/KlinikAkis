@@ -158,7 +158,9 @@ public static class RandevuEndpointleri
 
         var liste = await sorgu.OrderBy(r => r.Slot!.Baslangic).ThenBy(r => r.SiraNo).ToListAsync(ct);
         var takipNolari = await TakipNolari(db, liste.Select(r => r.Id), ct);
-        return TypedResults.Ok(liste.Select(r => Satir(r, rol, takipNolari.GetValueOrDefault(r.Id))).ToList());
+        var muayeneler = await MuayeneIdleri(db, liste.Select(r => r.Id), ct);
+        return TypedResults.Ok(liste.Select(r =>
+            Satir(r, rol, takipNolari.GetValueOrDefault(r.Id), muayeneler.GetValueOrDefault(r.Id))).ToList());
     }
 
     private static async Task<Results<Ok<RandevuSatiri>, ProblemHttpResult>> DurumDegistir(
@@ -237,7 +239,8 @@ public static class RandevuEndpointleri
         await yayinci.YayinlaAsync(tur, randevu.Id, gruplar, ct);
 
         var takipNolari = await TakipNolari(db, [randevu.Id], ct);
-        return TypedResults.Ok(Satir(randevu, rol, takipNolari.GetValueOrDefault(randevu.Id)));
+        var muayeneIdleri = await MuayeneIdleri(db, [randevu.Id], ct);
+        return TypedResults.Ok(Satir(randevu, rol, takipNolari.GetValueOrDefault(randevu.Id), muayeneIdleri.GetValueOrDefault(randevu.Id)));
     }
 
     private static async Task<Ok<List<HastaRandevusu>>> HastaRandevulari(
@@ -266,7 +269,14 @@ public static class RandevuEndpointleri
             .ToDictionaryAsync(k => k.RandevuId, k => k.TakipNo, ct);
     }
 
-    private static RandevuSatiri Satir(Randevu r, string rol, string? takipNo)
+    private static async Task<Dictionary<Guid, Guid?>> MuayeneIdleri(KlinikDbContext db, IEnumerable<Guid> randevuIdleri, CancellationToken ct)
+    {
+        var idler = randevuIdleri.ToList();
+        return await db.Muayeneler.AsNoTracking().Where(m => idler.Contains(m.RandevuId))
+            .ToDictionaryAsync(m => m.RandevuId, m => (Guid?)m.Id, ct);
+    }
+
+    private static RandevuSatiri Satir(Randevu r, string rol, string? takipNo, Guid? muayeneId)
     {
         var h = r.Hasta!;
         // Kabul masası tam adı görmez (taslak 7): maskeleme sunucuda, tam ad istemciye hiç gitmez.
@@ -276,7 +286,7 @@ public static class RandevuEndpointleri
             .Where(e => RandevuDurumMakinesi.DoktorEylemiMi(e) == doktorMu)
             .ToList();
         return new RandevuSatiri(r.Id, r.Slot!.Baslangic, r.SiraNo, r.Durum, r.HastaId, ad,
-            r.Hekim!.Brans!.Ad, $"{r.Hekim.Unvan} {r.Hekim.Ad}", r.Hekim.Oda, h.AcikRizaAlindi, takipNo, izinli, r.OnAnamnezId);
+            r.Hekim!.Brans!.Ad, $"{r.Hekim.Unvan} {r.Hekim.Ad}", r.Hekim.Oda, h.AcikRizaAlindi, takipNo, izinli, r.OnAnamnezId, muayeneId);
     }
 }
 
@@ -288,4 +298,4 @@ public sealed record HastaRandevusu(
 public sealed record RandevuSatiri(
     Guid Id, DateTime Baslangic, string SiraNo, RandevuDurumu Durum, Guid HastaId, string HastaAd,
     string BransAd, string HekimAd, string Oda, bool AcikRizaAlindi, string? TakipNo,
-    IReadOnlyList<RandevuEylemi> IzinliEylemler, Guid? OnAnamnezId);
+    IReadOnlyList<RandevuEylemi> IzinliEylemler, Guid? OnAnamnezId, Guid? MuayeneId);

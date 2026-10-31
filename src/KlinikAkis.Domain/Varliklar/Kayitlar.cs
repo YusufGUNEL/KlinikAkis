@@ -149,11 +149,21 @@ public sealed class Epikriz
 {
     public Guid Id { get; set; }
     public Guid MuayeneId { get; set; }
+    /// <summary>Yapılandırılmış taslak JSON'u: modelin cümleleri + kodda kurulan alerji ve tahlil satırları.</summary>
     public string AiTaslak { get; set; } = "";
+    /// <summary>
+    /// Hekim düzenleyip onayladıysa öykü/değerlendirme/plan metni; düz onayda null (taslak aynen geçerli).
+    /// Alerji ve tahlil satırları düzenlenmez, her zaman AiTaslak'tan basılır.
+    /// </summary>
     public string? SonMetin { get; set; }
     public AiKaynak Kaynak { get; set; }
+    /// <summary>Kart başlığı (SPEC §10.2): "AI taslağı · {model} · {saat}". Yedekte boş.</summary>
+    public string? AiModel { get; set; }
+    public DateTime AiZamani { get; set; }
+    public bool KotaDoldu { get; set; }
     public EpikrizDurumu Durum { get; set; } = EpikrizDurumu.Taslak;
     public Guid? OnaylayanHekimId { get; set; }
+    public DateTime? OnayZamani { get; set; }
 }
 
 public sealed class OutboxMesaji

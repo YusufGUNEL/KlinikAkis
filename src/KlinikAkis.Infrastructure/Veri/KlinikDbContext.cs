@@ -105,8 +105,15 @@ public sealed class KlinikDbContext(DbContextOptions<KlinikDbContext> options) :
             e.HasIndex(x => new { x.HastaId, x.TahlilTanimiId, x.Zaman });
         });
 
-        model.Entity<Epikriz>()
-            .HasOne<Muayene>().WithMany().HasForeignKey(x => x.MuayeneId).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<Epikriz>(e =>
+        {
+            e.HasOne<Muayene>().WithMany().HasForeignKey(x => x.MuayeneId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Hekim>().WithMany().HasForeignKey(x => x.OnaylayanHekimId).OnDelete(DeleteBehavior.Restrict);
+            // Muayene başına en fazla bir reddedilmemiş epikriz: eşzamanlı iki "oluştur" iki taslak yazamaz.
+            e.HasIndex(x => x.MuayeneId).IsUnique().HasFilter("\"Durum\" <> 'Reddedildi'");
+            // Eşzamanlı iki karardan ikincisi birincinin üzerine yazmasın (oku-kontrol-yaz, Randevu ile aynı).
+            e.Property(x => x.Durum).IsConcurrencyToken();
+        });
 
         model.Entity<ErisimKaydi>()
             .HasOne<Hasta>().WithMany().HasForeignKey(x => x.HastaId).OnDelete(DeleteBehavior.Restrict);

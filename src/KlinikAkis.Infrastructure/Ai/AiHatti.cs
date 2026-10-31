@@ -19,6 +19,9 @@ public sealed record AiSonucu(
 /// <summary>Tahlil açıklaması taslağı (SPEC §9.6): LLM ya da kural tabanlı yedek; model adı yalnızca LLM'de.</summary>
 public sealed record TahlilAiSonucu(AiKaynak Kaynak, string Aciklama, string? Model = null, bool KotaDoldu = false);
 
+/// <summary>Epikriz taslağı: modelin (ya da yedeğin) cümleleri + kodda kurulan alerji/tahlil satırları.</summary>
+public sealed record EpikrizAiSonucu(AiKaynak Kaynak, EpikrizTaslagi Taslak, string? Model = null, bool KotaDoldu = false);
+
 /// <summary>
 /// Her LLM çağrısının geçtiği tek yol (SPEC §9.1): maskeleme → kural kontrolü → kota → IChatClient (JSON şema,
 /// zaman aşımı) → sunucu doğrulaması → (hata/geçersiz/zaman aşımı) kural tabanlı yedek → denetim kaydı.
@@ -30,12 +33,16 @@ public sealed class AiHatti(
 {
     public const string OnAnamnezIstemSurumu = "onanamnez.v1";
     public const string TahlilIstemSurumu = "tahlil.v1";
+    public const string EpikrizIstemSurumu = "epikriz.v1";
     public const string KotaNedeni = "kota";
     private const int OnAnamnezMaxToken = 1500;
     private const int TahlilMaxToken = 400;
+    // Daha güçlü model düşünme belirteçleri de harcayabilir; üç kısa alan için pay bırakılır.
+    private const int EpikrizMaxToken = 2000;
 
     private static readonly string OnAnamnezIstemSablonu = IstemOku(OnAnamnezIstemSurumu);
     private static readonly string TahlilIstemi = IstemOku(TahlilIstemSurumu);
+    private static readonly string EpikrizIstemi = IstemOku(EpikrizIstemSurumu);
 
     /// <summary>Bir model çağrısının denetim kaydına giden ortak bilgisi.</summary>
     private sealed record Cagri(
@@ -126,6 +133,49 @@ public sealed class AiHatti(
 
         DenetimEkle(cagri, cikti, basarili: false, yedek: true, neden);
         return new TahlilAiSonucu(AiKaynak.Yedek, TahlilYedekSablonu.Olustur(girdi), null, sonuc.KotaDoldu);
+    }
+
+    /// <summary>
+    /// Epikriz taslağı (SPEC §13.7a): serbest metinler maskelenir, model yalnızca öykü/değerlendirme/plan cümlelerini
+    /// yazar; alerji ve tahlil satırları (işaretiyle) kodda kurulur. Model <c>AI:EpikrizModel</c> verildiyse o (istek
+    /// başına <c>ChatOptions.ModelId</c>), yoksa <c>AI:Model</c>. Yedek, kayıttaki maskesiz onaylı metinlerden kurulur.
+    /// </summary>
+    public async Task<EpikrizAiSonucu> EpikrizAsync(Hasta hasta, EpikrizGirdisi girdi, CancellationToken ct)
+    {
+        var maskeli = girdi.Maskele(hasta.Ad, hasta.Soyad).MaskeliMetin();
+        List<ChatMessage> mesajlar = [new(ChatRole.System, EpikrizIstemi), new(ChatRole.User, maskeli)];
+        var secenekler = new ChatOptions
+        {
+            MaxOutputTokens = EpikrizMaxToken,
+            Temperature = 0.2f,
+            ResponseFormat = EpikrizYaniti.YanitBicimi,
+            ModelId = ayar.EpikrizModel,
+            // Üç kısa alan için düşük düşünme yeter; 15 sn bütçe korunur. OpenAI uyumlu uçta reasoning_effort →
+            // Gemini thinking_level (ai.google.dev/gemini-api/docs/openai).
+            Reasoning = new ReasoningOptions { Effort = ReasoningEffort.Low },
+        };
+
+        var cagri = YeniCagri(AiOzellik.Epikriz, EpikrizIstemSurumu, hasta.Id, maskeli);
+        if (ayar.EpikrizModel is { } epikrizModeli)
+            cagri = cagri with { Model = epikrizModeli };
+        var sonuc = await CagirAsync(cagri, mesajlar, secenekler, ct);
+        string? cikti = null;
+        var neden = sonuc.Neden;
+        if (sonuc.Yanit is { } yanit)
+        {
+            cagri = cagri with { Model = yanit.ModelId ?? cagri.Model };
+            cikti = yanit.Text;
+            (var gecerli, neden) = EpikrizDogrulayici.Dogrula(cikti, maskeli);
+            if (gecerli is not null)
+            {
+                DenetimEkle(cagri, gecerli.JsonOlarak(), basarili: true, yedek: false, null);
+                return new EpikrizAiSonucu(AiKaynak.Llm, EpikrizTaslagi.Olustur(gecerli, girdi), cagri.Model);
+            }
+        }
+
+        DenetimEkle(cagri, cikti, basarili: false, yedek: true, neden);
+        return new EpikrizAiSonucu(AiKaynak.Yedek, EpikrizTaslagi.Olustur(EpikrizYedekSablonu.Olustur(girdi), girdi),
+            null, sonuc.KotaDoldu);
     }
 
     private Cagri YeniCagri(AiOzellik ozellik, string istemSurumu, Guid hastaId, string maskeli) =>

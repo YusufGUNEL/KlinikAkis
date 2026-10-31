@@ -100,6 +100,8 @@ export interface RandevuSatiri {
   izinliEylemler: RandevuEylemi[];
   /** Şikayet sohbetiyle alındıysa ön anamnez kartı (yoksa null). */
   onAnamnezId: string | null;
+  /** Muayeneye başlandıysa muayene (hekim notu, epikriz); yoksa null. */
+  muayeneId: string | null;
 }
 
 /** SignalR olayı: yalnızca {tur, id}; istemci ilgili REST'i yeniden çeker (SPEC §8). */
@@ -257,4 +259,42 @@ export interface ErisimSatiri {
   kullaniciRol: string;
   kullaniciAd: string;
   eylem: string;
+}
+
+export type EpikrizDurumu = 'Taslak' | 'Onaylandi' | 'Reddedildi';
+
+/** Epikriz taslağı: model cümleleri (öykü, değerlendirme, plan) + kodda kurulan alerji ve tahlil satırları. */
+export interface EpikrizTaslagi {
+  oyku: string;
+  degerlendirme: string;
+  plan: string;
+  alerji: string;
+  tahliller: string[];
+}
+
+export interface EpikrizKarari {
+  durum: EpikrizDurumu;
+  hekimAd: string;
+  zaman: string;
+}
+
+export interface EpikrizKarti {
+  id: string;
+  durum: EpikrizDurumu;
+  kaynak: AiKaynak;
+  model: string | null;
+  zaman: string;
+  kotaDoldu: boolean;
+  taslak: EpikrizTaslagi;
+  /** Hekim düzenleyip onayladıysa son metin. */
+  sonMetin: string | null;
+  karar: EpikrizKarari | null;
+}
+
+export interface MuayeneDetayi {
+  id: string;
+  randevuId: string;
+  durum: 'Acik' | 'Kapali';
+  hekimNotu: string | null;
+  epikriz: EpikrizKarti | null;
 }

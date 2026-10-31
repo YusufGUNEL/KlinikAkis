@@ -131,7 +131,8 @@ var app = builder.Build();
 
 if (aiAyar.Uyari is { } aiUyarisi)
     app.Logger.LogWarning("{Uyari}", aiUyarisi);
-app.Logger.LogInformation("AI sağlayıcı: {Saglayici} · model: {Model} · günlük limit: {Limit}", aiAyar.Saglayici, aiAyar.Model, aiAyar.GunlukLimit);
+app.Logger.LogInformation("AI sağlayıcı: {Saglayici} · model: {Model} · epikriz modeli: {EpikrizModel} · günlük limit: {Limit}",
+    aiAyar.Saglayici, aiAyar.Model, aiAyar.EpikrizModel ?? aiAyar.Model, aiAyar.GunlukLimit);
 if (geciciAnahtar)
     app.Logger.LogWarning("Jwt:Key tanımlı değil; geçici anahtar üretildi. Kalıcı anahtar için: dotnet user-secrets set \"Jwt:Key\" <en az 32 karakter>");
 
@@ -176,7 +177,8 @@ api.MapDemoEndpointleri()
     .MapHastaEndpointleri()
     .MapRandevuEndpointleri()
     .MapOnAnamnezEndpointleri()
-    .MapTahlilEndpointleri();
+    .MapTahlilEndpointleri()
+    .MapMuayeneEndpointleri();
 
 app.MapHub<KlinikHub>(KlinikHub.Yol).RequireAuthorization();
 
