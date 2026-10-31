@@ -11,6 +11,9 @@ public static class TurkceMetin
 {
     private static readonly CultureInfo Tr = CultureInfo.GetCultureInfo("tr-TR");
 
+    /// <summary>Ekranda gösterilen ad listeleri için alfabe sırası (Ç, Ğ, İ, Ö, Ş, Ü kendi yerinde).</summary>
+    public static readonly StringComparer Siralama = StringComparer.Create(Tr, ignoreCase: false);
+
     /// <summary>tr-TR küçük harf, kesme işaretleri birleşir ("Ayşe'nin" → "ayşenin"), diğer noktalama boşluk olur, boşluk sadeleşir.</summary>
     public static string Normalize(string? metin)
     {

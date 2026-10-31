@@ -63,7 +63,9 @@ describe('Sikayet', () => {
 
     const bant = el.querySelector('[role=alert]')!;
     expect(bant.textContent).toContain('112');
-    expect(bant.querySelector('a[href="tel:112"]')).not.toBeNull();
+    // 112 alanı var ama şimdilik aramaz: yanlışlıkla dokunulunca telefon çalmasın.
+    expect(bant.textContent).toContain("112'yi arayın");
+    expect(el.querySelector('a[href^="tel:"]')).toBeNull();
     expect(el.querySelector('#cevap-metni')).toBeNull();
     expect(el.textContent).not.toContain('Randevu saatini seçin');
   });
@@ -83,9 +85,7 @@ describe('Sikayet', () => {
       kart: {
         id: 'o1',
         durum: 'Taslak',
-        kaynak: 'Llm',
         zaman: '2026-10-29T10:52:00Z',
-        kotaDoldu: true,
         cevaplar: [
           { adim: 1, soru: 'Şikayetiniz nedir?', cevap: 'çok su içiyorum' },
           { adim: 2, soru: 'Ne kadar süredir?', cevap: 'Daha uzun' },

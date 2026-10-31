@@ -52,7 +52,8 @@ export interface HekimOnayi {
   `,
 })
 export class AiKarti {
-  readonly kaynak = input.required<AiKaynak>();
+  /** Hekim kartında zorunlu; hasta kartında yok (hasta taslağın nasıl üretildiğini görmez). */
+  readonly kaynak = input<AiKaynak>('Kural');
   /** Üretim zamanı (UTC ISO). */
   readonly zaman = input.required<string>();
   readonly model = input('');

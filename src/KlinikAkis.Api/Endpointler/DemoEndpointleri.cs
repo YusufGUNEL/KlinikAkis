@@ -45,10 +45,10 @@ public static class DemoEndpointleri
         List<KimlikOgesi> liste = rol switch
         {
             "hasta" => await SenaryoHastalari(db, simdi, ct),
-            "doktor" => await db.Hekimler.AsNoTracking()
-                .OrderBy(h => h.Ad)
-                .Select(h => new KimlikOgesi(h.Id, h.Unvan + " " + h.Ad, h.Brans!.Ad + " · Oda " + h.Oda))
-                .ToListAsync(ct),
+            "doktor" => (await db.Hekimler.AsNoTracking()
+                .Select(h => new { h.Ad, Oge = new KimlikOgesi(h.Id, h.Unvan + " " + h.Ad, h.Brans!.Ad + " · Oda " + h.Oda) })
+                .ToListAsync(ct))
+                .OrderBy(h => h.Ad, TurkceMetin.Siralama).Select(h => h.Oge).ToList(),
             "tv" => await TvBranslari(db, ct),
             _ => [], // kabul: kimlik seçimi yok, tek kabul ekranı
         };

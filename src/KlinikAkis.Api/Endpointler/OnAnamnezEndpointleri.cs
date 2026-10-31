@@ -260,7 +260,7 @@ public static class OnAnamnezEndpointleri
     private static HastaOzetKarti? HastaKarti(OnAnamnezKarti? k, IReadOnlyList<SohbetKaydi> sohbet) =>
         k is null
             ? null
-            : new HastaOzetKarti(k.Id, k.Durum, k.Kaynak, k.Zaman, k.KotaDoldu,
+            : new HastaOzetKarti(k.Id, k.Durum, k.Zaman,
                 sohbet.Where(s => !string.IsNullOrWhiteSpace(s.Cevap) && s.Cevap != SoruAgaci.Hicbiri)
                     .Select(s => new HastaCevabi(s.Adim, s.Soru, s.Cevap)).ToList(),
                 k.Onerilen, k.Alternatif);
@@ -345,7 +345,7 @@ public sealed record HastaCevabi(int Adim, string Soru, string Cevap);
 
 /// <summary>Hastanın gördüğü özet (taslak 2): kendi cevapları + bölüm önerisi; model metni yok.</summary>
 public sealed record HastaOzetKarti(
-    Guid Id, OnAnamnezDurumu Durum, AiKaynak Kaynak, DateTime Zaman, bool KotaDoldu,
+    Guid Id, OnAnamnezDurumu Durum, DateTime Zaman,
     IReadOnlyList<HastaCevabi> Cevaplar, BolumOnerisi Onerilen, BolumOnerisi? Alternatif);
 
 public sealed record HekimKarari(OnAnamnezDurumu Durum, string HekimAd, DateTime Zaman, string? Duzeltme);

@@ -14,6 +14,20 @@ export const KURAL_ETIKETI: Record<string, string> = {
   AgirNefesDarligi: 'Ağır nefes darlığı',
 };
 
+/** Sağlayıcının ekrandaki adı; denetim kaydında yapılandırma adı (Gemini/Ollama/Fake/Kural) aynen kalır. */
+export function saglayiciEtiketi(saglayici: string): string {
+  switch (saglayici) {
+    case 'Fake':
+      return 'Çevrimdışı demo sağlayıcı';
+    case 'Ollama':
+      return 'Ollama (yerel)';
+    case 'Kural':
+      return 'Kural tabanlı';
+    default:
+      return saglayici;
+  }
+}
+
 /**
  * "Modele giden veri" paneli (taslak 6, SPEC §9.2): modele giden maskeli metin aynen ve denetim kaydı.
  * Kural dalında modelin hiç çağrılmadığı, yedek/kota dalında nedeni açıkça yazar.
@@ -39,7 +53,7 @@ export const KURAL_ETIKETI: Record<string, string> = {
         <h3 class="text-xs font-semibold tracking-wide text-slate-600 uppercase">Denetim</h3>
         <dl class="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 tabular-nums">
           <dt class="text-slate-600">Model</dt>
-          <dd data-test="denetim-model">{{ d.saglayici }}{{ d.model ? ' / ' + d.model : '' }}</dd>
+          <dd data-test="denetim-model">{{ etiket(d.saglayici) }}{{ d.model ? ' / ' + d.model : '' }}</dd>
           <dt class="text-slate-600">İstem</dt><dd>{{ d.istemSurumu }}</dd>
           <dt class="text-slate-600">Süre</dt><dd>{{ d.gecikmeMs / 1000 | number: '1.1-1' }} sn</dd>
           <dt class="text-slate-600">Girdi hash</dt><dd [title]="d.girdiHash">{{ d.girdiHash.slice(0, 8) }}…</dd>
@@ -57,4 +71,5 @@ export const KURAL_ETIKETI: Record<string, string> = {
 export class ModeleGidenVeri {
   readonly kayit = input.required<DenetimSatiri>();
   protected readonly kuralEtiketi = KURAL_ETIKETI;
+  protected readonly etiket = saglayiciEtiketi;
 }

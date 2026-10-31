@@ -73,7 +73,7 @@ type HastaCevabi = 'bekliyor' | 'duzeltiyor' | 'dogru' | 'notlu';
       <div id="kirmizi-bayrak" tabindex="-1" class="mt-4 outline-none rounded-lg bg-tehlike p-4 text-white" role="alert">
         <p class="text-lg font-semibold"><span aria-hidden="true">⚠ </span>{{ b.mesaj }}</p>
         <a
-          href="tel:112"
+          [attr.href]="acilArama"
           class="mt-3 flex min-h-12 items-center justify-center rounded-lg bg-white text-lg font-semibold text-tehlike focus-visible:outline-white"
         >
           <span aria-hidden="true">📞 </span>112'yi arayın
@@ -135,9 +135,12 @@ type HastaCevabi = 'bekliyor' | 'duzeltiyor' | 'dogru' | 'notlu';
             (input)="metin.set($any($event.target).value)"
             [disabled]="gonderiliyor()"
           />
-          <button pButton type="submit" class="min-h-12 min-w-12" aria-label="Gönder" [disabled]="gonderiliyor() || !gonderilebilir()">
-            <span aria-hidden="true">➤</span>
-          </button>
+          <!-- Çoklu seçimde tek düğme "Devam": seçim + yazı birlikte gider (Enter yine gönderir). -->
+          @if (!s.cokluSecim) {
+            <button pButton type="submit" class="min-h-12 min-w-12" aria-label="Gönder" [disabled]="gonderiliyor() || !gonderilebilir()">
+              <span aria-hidden="true">➤</span>
+            </button>
+          }
         </form>
 
         @if (s.atlanabilir) {
@@ -157,7 +160,7 @@ type HastaCevabi = 'bekliyor' | 'duzeltiyor' | 'dogru' | 'notlu';
     } @else if (asama() === 'onay' && kart(); as k) {
       <section class="mt-4" aria-labelledby="ozet-baslik">
         <h2 id="ozet-baslik" tabindex="-1" class="text-lg font-semibold outline-none text-slate-900">Doktorunuza gidecek özet</h2>
-        <app-ai-karti class="mt-2 block text-[17px]" [kaynak]="k.kaynak" [zaman]="k.zaman" [kotaDoldu]="k.kotaDoldu" hedef="hasta">
+        <app-ai-karti class="mt-2 block text-[17px]" [zaman]="k.zaman" hedef="hasta">
           <p class="text-base text-slate-700">Cevaplarınız doktorunuza iletilir; doktorunuz muayenede değerlendirir.</p>
           <!-- Hasta yalnızca kendi cevaplarını görür; modelin yazdığı metin hekim onayı olmadan hastaya gösterilmez. -->
           <dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1" data-test="cevaplar">
@@ -246,7 +249,7 @@ type HastaCevabi = 'bekliyor' | 'duzeltiyor' | 'dogru' | 'notlu';
     @if (!bayrak()) {
       <p class="sticky bottom-0 -mx-4 mt-6 border-t border-slate-200 bg-white px-4 py-1 text-base text-slate-700">
         <span aria-hidden="true">⚠ </span>Göğüs ağrısı, nefes darlığı ya da bilinç kaybı varsa beklemeyin:
-        <a href="tel:112" class="inline-flex min-h-12 items-center font-semibold text-ana underline">112'yi arayın</a>
+        <a [attr.href]="acilArama" class="inline-flex min-h-12 items-center font-semibold text-slate-900" [class.text-ana]="acilArama" [class.underline]="acilArama">112'yi arayın</a>
       </p>
     }
   `,
@@ -255,6 +258,12 @@ export class Sikayet {
   private readonly islemler = inject(OnAnamnezIslemleri);
   private readonly kok = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+
+  /**
+   * 112 alanı yerinde duruyor ama şimdilik bağlantısız: demo sırasında ekrana yanlışlıkla dokunulunca
+   * telefon gerçekten 112'yi aramasın. Gerçek kullanımda 'tel:112' yapılır (SPEC §9.3).
+   */
+  protected readonly acilArama: string | null = null;
 
   protected id = '';
   protected readonly asama = signal<Asama>('basliyor');
@@ -379,7 +388,7 @@ export class Sikayet {
     }
   }
 
-  /** Form kalkıyor: klavye odağı body'ye düşmesin, banda (ve oradan 112 bağlantısına) gitsin. */
+  /** Form kalkıyor: klavye odağı body'ye düşmesin, banda gitsin. */
   private bayrakGoster(b: KirmiziBayrak): void {
     this.bayrak.set(b);
     this.soru.set(null);

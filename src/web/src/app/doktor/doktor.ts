@@ -5,14 +5,14 @@ import { QRCodeComponent } from 'angularx-qrcode';
 import { ButtonModule } from 'primeng/button';
 import { DenetimSatiri, ErisimSatiri, HastaOzeti, OnAnamnezDetayi, RandevuEylemi, RandevuSatiri } from '../cekirdek/api';
 import { HubService, hubIleYenile } from '../cekirdek/hub';
-import { EYLEM_ETIKETI, hataMesaji, RandevuIslemleri, saatEtiketi } from '../cekirdek/randevu';
+import { EYLEM_ETIKETI, EYLEM_SONUCU, hataMesaji, RandevuIslemleri, saatEtiketi } from '../cekirdek/randevu';
 import { BaglantiGostergesi } from '../ortak/baglanti-gostergesi';
 import { DurumKutusu } from '../ortak/durum-kutusu';
 import { DurumRozeti } from '../ortak/durum-rozeti';
 import { HastaBandi } from '../ortak/hasta-bandi';
 import { simdiSinyali } from '../ortak/simdi';
 import { UstCubuk } from '../ortak/ust-cubuk';
-import { ModeleGidenVeri } from './modele-giden-veri';
+import { ModeleGidenVeri, saglayiciEtiketi } from './modele-giden-veri';
 import { OnAnamnezKartiBileseni } from './onanamnez-karti';
 
 /** QR'ın açtığı senaryo hastası (Ayşe K., SPEC §6). */
@@ -153,7 +153,7 @@ const DOKTOR_EYLEMLERI: RandevuEylemi[] = ['Cagir', 'Basla', 'Kapat'];
             <h2 id="mgv-yan-baslik" class="text-xs font-semibold tracking-wide text-slate-600 uppercase">Modele giden veri</h2>
             @if (sonDenetim(); as d) {
               <p class="mt-1 text-slate-700">
-                <span class="tabular-nums">{{ d.zaman | date: 'HH:mm' }}</span> · {{ d.saglayici }} ·
+                <span class="tabular-nums">{{ d.zaman | date: 'HH:mm' }}</span> · {{ saglayiciEtiketi(d.saglayici) }} ·
                 {{ d.saglayici === 'Kural' ? 'model çağrılmadı' : d.yedegeDustu ? 'yedek' : 'model yanıtı' }}
               </p>
               <button
@@ -208,6 +208,7 @@ export class Doktor {
   protected readonly bugun = simdiSinyali();
   protected readonly doktorEylemleri = DOKTOR_EYLEMLERI;
   protected readonly etiketler = EYLEM_ETIKETI;
+  protected readonly saglayiciEtiketi = saglayiciEtiketi;
   protected readonly qrAdresi = `${location.origin}/giris?rol=hasta&kimlik=${QR_HASTA_ID}`;
 
   protected readonly seciliId = signal<string | null>(null);
@@ -297,7 +298,7 @@ export class Doktor {
     this.hata.set('');
     try {
       await this.islemler.uygula(r.id, eylem);
-      this.duyuru.set(`${r.siraNo} ${r.hastaAd}: ${this.etiketler[eylem]} tamam`);
+      this.duyuru.set(`${r.siraNo} ${r.hastaAd}: ${EYLEM_SONUCU[eylem]}`);
     } catch (e) {
       this.hata.set(hataMesaji(e));
     } finally {

@@ -61,6 +61,16 @@ export function saatEtiketi(isoUtc: string, simdi: Date = new Date()): string {
   return etiket.startsWith('Bugün ') ? etiket.slice('Bugün '.length) : etiket;
 }
 
+/** Eylem bittikten sonra ekran okuyucuya okunan cümle ("A-001 Ayşe K.: hasta çağrıldı"). */
+export const EYLEM_SONUCU: Record<RandevuEylemi, string> = {
+  Kabul: 'kabul edildi',
+  Cagir: 'hasta çağrıldı',
+  Basla: 'muayene başladı',
+  Kapat: 'vizit kapatıldı',
+  Iptal: 'randevu iptal edildi',
+  Gelmedi: 'gelmedi olarak işaretlendi',
+};
+
 export const EYLEM_ETIKETI: Record<RandevuEylemi, string> = {
   Kabul: 'Kabul et',
   Cagir: 'Hastayı çağır',

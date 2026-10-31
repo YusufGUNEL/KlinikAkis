@@ -107,7 +107,8 @@ public sealed class OnAnamnezTestleri(KlinikApiFabrikasi fabrika) : IClassFixtur
         Assert.False(kart.TryGetProperty("model", out _));
         Assert.False(kart.TryGetProperty("taslak", out _));
         Assert.Contains(kart.GetProperty("cevaplar").EnumerateArray(), c => c.GetProperty("adim").GetInt32() == 1);
-        Assert.False(kart.GetProperty("kotaDoldu").GetBoolean());
+        Assert.False(kart.TryGetProperty("kotaDoldu", out _));  // kota iç işleyiştir, hastaya gitmez
+        Assert.False(kart.TryGetProperty("kaynak", out _));
 
         // Model denetim kaydında maskeli metni görür (doktorun "modele giden veri" ucu).
         var doktor = await fabrika.GirisYapAsync("doktor", SenaryoIdleri.HekimEndokrinoloji);

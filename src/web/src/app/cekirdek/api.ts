@@ -155,9 +155,7 @@ export interface HastaCevabi {
 export interface HastaOzetKarti {
   id: string;
   durum: OnAnamnezDurumu;
-  kaynak: AiKaynak;
   zaman: string;
-  kotaDoldu: boolean;
   cevaplar: HastaCevabi[];
   onerilen: BolumOnerisi;
   alternatif: BolumOnerisi | null;

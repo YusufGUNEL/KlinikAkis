@@ -67,6 +67,8 @@ public static partial class Maskeleyici
         if (string.IsNullOrEmpty(metin)) return metin;
         // Önce biçim karakterleri silinir, sonra NFC: "s + ZWJ + birleşik çengel" de "ş" olsun.
         metin = BicimKarakteri().Replace(metin, "").Normalize(NormalizationForm.FormC);
+        // Tam genişlikli ("０５３２") ve başka yazı sistemlerinin rakamları ASCII'ye: TC/telefon desenleri kaçmasın.
+        metin = AsciiRakam(metin);
 
         var sonuc = EpostaDeseni().Replace(metin, Eposta);
         sonuc = TcAdayi().Replace(sonuc, m => TcKimlik.GecerliMi(Rakamlar(m.Value)) ? Tc : m.Value);
@@ -85,6 +87,19 @@ public static partial class Maskeleyici
     }
 
     private static string Rakamlar(string s) => string.Concat(s.Where(char.IsAsciiDigit));
+
+    private static string AsciiRakam(string s)
+    {
+        if (!s.Any(c => char.IsDigit(c) && !char.IsAsciiDigit(c))) return s;
+        return string.Create(s.Length, s, static (hedef, kaynak) =>
+        {
+            for (var i = 0; i < kaynak.Length; i++)
+            {
+                var c = kaynak[i];
+                hedef[i] = char.IsDigit(c) && !char.IsAsciiDigit(c) ? (char)('0' + (int)char.GetNumericValue(c)) : c;
+            }
+        });
+    }
 
     private static List<string> Parcalar(string? isim) =>
         string.IsNullOrWhiteSpace(isim)

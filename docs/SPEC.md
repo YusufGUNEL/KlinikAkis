@@ -323,7 +323,7 @@ gebelik + kanama · 3 ay altı bebekte ateş.
   birleşir) → bant anında görünür. Olumsuzlama ("göğüs ağrım yok") ayırt edilmez:
   **fazla tetiklemek güvenli taraftır** (bilinçli karar, README'de yazar).
 - Tetiklenirse: LLM çağrılmaz, randevu akışı durur, ekranda "112'yi arayın / en yakın acile başvurun"
-  (`tel:112` bağlantısı), OnAnamnez.Durum = `KirmiziBayrak`, denetim kaydına kural adı yazılır.
+  (alan yerinde ama demo süresince bağlantısız: yanlışlıkla dokunulunca telefon aramasın; gerçek kullanımda `tel:112`), OnAnamnez.Durum = `KirmiziBayrak`, denetim kaydına kural adı yazılır.
 
 ### 9.4 Soru ağacı (deterministik, 6 adım)
 1. Ana şikayet (serbest metin + sık şikayet hızlı butonları) · 2. Süre (1 günden az / 1-3 gün / 1 hafta /
@@ -527,7 +527,7 @@ Butonlar yalnızca durum makinesine uygun olduğunda etkin. Tablolar 32-36 px sa
 │ [Hastaya yayınla]   ← kod H/L verdi, AI sadece cümle kurdu │
 ```
 
-**6. Modele giden veri paneli (yan panel)**
+**6. Modele giden veri paneli** (yan paneldeki "Göster" ile açılır; iki sütunlu olduğu için orta sütunda, kartın altında gösterilir)
 ```
 │ Gönderilen istem (maskeli)            │ Denetim                │
 │ hasta: P-7F3A · yaş: 50-59 ·          │ model: <sağlayıcı/ad>  │
@@ -567,7 +567,8 @@ Butonlar yalnızca durum makinesine uygun olduğunda etkin. Tablolar 32-36 px sa
 
 ### 10.5 Türkçe yerel ayar — teknik kurallar
 - **Angular:** `registerLocaleData(localeTr)`, `LOCALE_ID = 'tr'`; tarih `dd.MM.yyyy`, saat `HH:mm`;
-  `DecimalPipe` virgül verir. Saatler `Intl`/DatePipe ile `Europe/Istanbul` dilimine çevrilir.
+  `DecimalPipe` virgül verir. Saatler DatePipe ile Türkiye saatine çevrilir: `DATE_PIPE_DEFAULT_OPTIONS`
+  `timezone: '+0300'` (Türkiye 2016'dan beri yaz saati uygulamaz; DatePipe IANA adı almaz).
 - Angular'ın `uppercase` pipe'ı **kullanılmaz** (`toUpperCase()` yerel ayarı bilmez: "i" → "I").
   Bunun yerine `trUpper` pipe'ı (`toLocaleUpperCase('tr-TR')`). CSS `text-transform: uppercase`
   `lang="tr"` ile doğru çalışır.

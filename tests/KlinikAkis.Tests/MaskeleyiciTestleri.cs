@@ -70,6 +70,14 @@ public sealed class MaskeleyiciTestleri
     }
 
     [Fact]
+    public void Tam_genislikli_rakamlar_da_maskelenir()
+    {
+        var tamGenislik = string.Concat(GecerliTc.Select(c => (char)(c - '0' + '０')));
+        Assert.Equal("TC: [TC]", Maskeleyici.Maskele($"TC: {tamGenislik}"));
+        Assert.Equal("ara [TELEFON]", Maskeleyici.Maskele("ara ０５３２ 123 45 67"));
+    }
+
+    [Fact]
     public void Eposta_maskelenir()
     {
         Assert.Equal("yaz: [EPOSTA].", Maskeleyici.Maskele("yaz: ayse.kaya@ornek.test."));
@@ -119,7 +127,7 @@ public sealed class MaskeleyiciTestleri
     }
 
     [Fact]
-    public void Noktali_i_ile_yazilan_ad_da_maskelenir()
+    public void Noktasiz_i_ile_yazilan_ad_da_maskelenir()
     {
         Assert.Equal("[AD] ve [SOYAD]", Maskeleyici.Maskele("HASAN ve YILDIZ'IN", "Hasan", "Yıldız"));
         Assert.Equal("[SOYAD]", Maskeleyici.Maskele("yildiz", "Hasan", "Yıldız"));
