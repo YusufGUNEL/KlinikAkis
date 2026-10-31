@@ -104,6 +104,14 @@ export interface RandevuSatiri {
   muayeneId: string | null;
 }
 
+/** TV sıra ekranındaki çağrı (taslak 8); ad sunucuda baş harfe indirgenir. */
+export interface TvCagrisi {
+  siraNo: string;
+  oda: string;
+  basHarfler: string;
+  zaman: string;
+}
+
 /** SignalR olayı: yalnızca {tur, id}; istemci ilgili REST'i yeniden çeker (SPEC §8). */
 export interface Olay {
   tur: string;

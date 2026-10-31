@@ -145,7 +145,7 @@ gösterilir. `DateTimeOffset` kullanılmaz (SQLite sağlayıcısı sıralayamaz)
 | **Brans** | Id, Ad (≈30 MHRS tarzı klinik: Dahiliye, KBB, Kardiyoloji, Nöroloji, Göz, Ortopedi, Çocuk Sağlığı, Kadın Doğum, Dermatoloji, Üroloji, Göğüs Hastalıkları, Endokrinoloji, Genel Cerrahi, Psikiyatri, FTR...), Kod (enum, ASCII: `Endokrinoloji`, `Kbb`...) |
 | **Hekim** | Id, Ad, Unvan, BransId, Oda |
 | **Slot** | Id, HekimId, Baslangic (UTC), SureDk (10), Dolu |
-| **Randevu** | Id, HastaId, HekimId, SlotId, Durum (§5.1), SiraNo (örn. A-017, branş+gün içinde artan), OnAnamnezId? |
+| **Randevu** | Id, HastaId, HekimId, SlotId, Durum (§5.1), SiraNo (örn. A-017, branş+gün içinde artan), OnAnamnezId?, CagrilmaZamani? (`cagir` anı; TV son çağrıları buna göre sıralar) |
 | **Kabul** | Id, RandevuId, KabulZamani, TakipNo (`SIM-000123`, simülasyon, ASCII), KabulEden |
 | **OnAnamnez** | Id, HastaId, RandevuId? (randevu oluşunca bağlanır), SohbetJson (adım, soru, cevap), AiTaslakJson, Kaynak (`Llm` \| `Yedek` \| `Kural`), HastaOnayi (bool + hasta notu), HekimDuzeltmesi (metin?), Durum (`Sohbette`, `KirmiziBayrak`, `Taslak`, `Onaylandi`, `Duzenlendi`, `Reddedildi`), OnaylayanHekimId, OnayZamani, KirmiziBayrakKurali?, AiModel?, AiZamani?, KotaDoldu (bool). AiTaslakJson §9.5 şemasıdır; `Siddet` (`Hafif`/`Orta`/`Siddetli`) ve `Aciliyet` (`Rutin`/`Oncelikli`) enum'ları oradan gelir ve değerlerini kod belirler |
 | **Muayene** | Id, RandevuId, BaslangicZamani, HekimNotu, Tanilar (ICD-10 kod listesi, artı aşamada), Durum (`Acik`, `Kapali`) |
@@ -237,6 +237,7 @@ Tümü `/api` altında, JSON. Hata formatı ProblemDetails. Rol kontrolü JWT cl
 | GET | `/randevular?hekimId=&tarih=` | doktor, kabul | Liste |
 | POST | `/randevular/{id}/kabul` \| `/cagir` \| `/basla` \| `/kapat` \| `/iptal` \| `/gelmedi` | kabul / doktor | Durum geçişleri (§5.1) |
 | GET | `/hasta/me/randevular` | hasta | Hastanın randevuları + durum (çağrıldıysa oda) |
+| GET | `/tv/cagrilar` | tv | (artı) Bugünkü son 3 çağrı `{siraNo, oda, basHarfler, zaman}`; branş token'daki claim'den, ad baş harfe indirgenir |
 | GET | `/hastalar/{id}/ozet` | doktor | Hasta bandı + sol sütun (erişim kaydı yazar) |
 | GET | `/onanamnez/{id}` | doktor | Kart verisi |
 | POST | `/onanamnez/{id}/karar` | doktor | `onayla` / `duzenle` (metinle) / `reddet` |

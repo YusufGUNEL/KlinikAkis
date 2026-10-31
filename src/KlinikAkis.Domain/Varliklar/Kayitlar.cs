@@ -60,6 +60,8 @@ public sealed class Randevu
     public RandevuDurumu Durum { get; set; } = RandevuDurumu.Planlandi;
     public string SiraNo { get; set; } = "";
     public Guid? OnAnamnezId { get; set; }
+    /// <summary>"Hastayı çağır" anı (UTC); TV'deki son çağrılar slot saatine göre değil buna göre sıralanır.</summary>
+    public DateTime? CagrilmaZamani { get; set; }
 }
 
 public sealed class Kabul

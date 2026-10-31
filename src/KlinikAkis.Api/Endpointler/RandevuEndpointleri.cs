@@ -204,6 +204,9 @@ public static class RandevuEndpointleri
                     KabulEden = kullanici.FindFirstValue(DemoClaim.Ad) ?? "",
                 });
                 break;
+            case RandevuEylemi.Cagir:
+                randevu.CagrilmaZamani = simdi;
+                break;
             case RandevuEylemi.Basla:
                 db.Muayeneler.Add(new Muayene { Id = Guid.NewGuid(), RandevuId = randevu.Id, BaslangicZamani = simdi });
                 break;

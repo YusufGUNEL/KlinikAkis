@@ -157,14 +157,15 @@ public sealed class RandevuTestleri(KlinikApiFabrikasi fabrika) : IClassFixture<
     }
 
     [Theory]
-    [InlineData("Ayşe", "Kaya", "Ayşe K.", "A*** K***")]
-    [InlineData("İsmail", "Işık", "İsmail I.", "İ*** I***")]
-    [InlineData("Ömer", "Ünal", "Ömer Ü.", "Ö*** Ü***")]
-    [InlineData("Özge", "Çelik", "Özge Ç.", "Ö*** Ç***")] // ayrışık (NFD) harf bölünmez
-    public void Ad_gosterimi_bas_harfi_metin_ogesine_gore_alir(string ad, string soyad, string kisa, string maskeli)
+    [InlineData("Ayşe", "Kaya", "Ayşe K.", "A*** K***", "A.K.")]
+    [InlineData("İsmail", "Işık", "İsmail I.", "İ*** I***", "İ.I.")]
+    [InlineData("Ömer", "Ünal", "Ömer Ü.", "Ö*** Ü***", "Ö.Ü.")]
+    [InlineData("Özge", "Çelik", "Özge Ç.", "Ö*** Ç***", "Ö.Ç.")] // ayrışık (NFD) harf bölünmez
+    public void Ad_gosterimi_bas_harfi_metin_ogesine_gore_alir(string ad, string soyad, string kisa, string maskeli, string basHarfler)
     {
         Assert.Equal(kisa, AdGosterimi.Kisa(ad, soyad));
         Assert.Equal(maskeli, AdGosterimi.Maskeli(ad, soyad));
+        Assert.Equal(basHarfler, AdGosterimi.BasHarfler(ad, soyad));
     }
 
     [Fact]
