@@ -4,6 +4,7 @@ import { EpikrizTaslagi, HekimKararTuru, MuayeneDetayi } from '../cekirdek/api';
 import { MuayeneIslemleri } from '../cekirdek/muayene';
 import { hataMesaji } from '../cekirdek/randevu';
 import { AiKarti, HekimOnayi } from '../ortak/ai-karti';
+import { TaniKarti } from './tani-karti';
 
 /**
  * Düzenleme kutusuna giden düz metin: yalnızca modelin yazdığı bölümler. Alerji ve tahlil satırları kayıttan/koddan
@@ -20,7 +21,7 @@ export function epikrizMetni(t: EpikrizTaslagi): string {
  */
 @Component({
   selector: 'app-epikriz-sekmesi',
-  imports: [AiKarti, ButtonModule],
+  imports: [AiKarti, ButtonModule, TaniKarti],
   template: `
     <div class="flex max-w-3xl flex-col gap-4">
       <form class="flex flex-col gap-2" (submit)="$event.preventDefault(); notKaydet()">
@@ -44,6 +45,8 @@ export function epikrizMetni(t: EpikrizTaslagi): string {
           }
         </div>
       </form>
+
+      <app-tani-karti [detay]="detay()" (degisti)="degisti.emit()" />
 
       @if (detay().epikriz; as e) {
         <p id="epikriz-karti-baslik" tabindex="-1" class="sr-only">Epikriz kartı, durum: {{ durumEtiketi[e.durum] }}</p>
@@ -163,6 +166,7 @@ export class EpikrizSekmesi {
   protected readonly islemde = signal(false);
   protected readonly uretiliyor = signal(false);
   protected readonly hata = signal('');
+  private readonly bekleyenOdak = signal(false);
 
   protected readonly kapali = computed(() => this.detay().durum === 'Kapali');
   protected readonly notDegisti = computed(() => this.not().trim() !== (this.detay().hekimNotu ?? ''));
@@ -184,6 +188,13 @@ export class EpikrizSekmesi {
         sonMuayene = d.id;
       });
     });
+    effect(() => {
+      if (!this.bekleyenOdak() || this.detay().epikriz?.durum !== 'Taslak') return;
+      untracked(() => {
+        this.bekleyenOdak.set(false);
+        this.odakla('#epikriz-karti-baslik');
+      });
+    });
   }
 
   protected async notKaydet(): Promise<void> {
@@ -199,7 +210,8 @@ export class EpikrizSekmesi {
       // Kaydedilmemiş not varsa önce kaydedilir: taslak ekrandaki notla üretilsin.
       if (this.notDegisti() && !this.kapali()) await this.islemler.notKaydet(this.detay().id, this.not().trim() || null);
       await this.islemler.epikrizUret(this.detay().id);
-      this.odakla('#epikriz-karti-baslik');
+      // Kart üst bileşen muayeneyi yeniden çekince gelir; odak o zaman verilir (yoksa body'ye düşer).
+      this.bekleyenOdak.set(true);
     });
     this.uretiliyor.set(false);
   }

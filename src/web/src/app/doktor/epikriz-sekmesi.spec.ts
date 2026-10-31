@@ -30,6 +30,8 @@ const muayene = (epikriz: EpikrizKarti | null): MuayeneDetayi => ({
   durum: 'Acik',
   hekimNotu: 'Ağız kuruluğu',
   epikriz,
+  tanilar: [],
+  taniOnerisi: null,
 });
 
 @Component({

@@ -18,6 +18,7 @@ public sealed class KlinikDbContext(DbContextOptions<KlinikDbContext> options) :
     public DbSet<TahlilTanimi> TahlilTanimlari => Set<TahlilTanimi>();
     public DbSet<TahlilSonucu> TahlilSonuclari => Set<TahlilSonucu>();
     public DbSet<Epikriz> Epikrizler => Set<Epikriz>();
+    public DbSet<TaniOnerisi> TaniOnerileri => Set<TaniOnerisi>();
     public DbSet<OutboxMesaji> OutboxMesajlari => Set<OutboxMesaji>();
     public DbSet<AiAuditLog> AiAuditLoglari => Set<AiAuditLog>();
     public DbSet<ErisimKaydi> ErisimKayitlari => Set<ErisimKaydi>();
@@ -43,6 +44,7 @@ public sealed class KlinikDbContext(DbContextOptions<KlinikDbContext> options) :
         yapilandirma.Properties<PaketTipi>().HaveConversion<string>().HaveMaxLength(20);
         yapilandirma.Properties<OutboxDurumu>().HaveConversion<string>().HaveMaxLength(20);
         yapilandirma.Properties<AiOzellik>().HaveConversion<string>().HaveMaxLength(20);
+        yapilandirma.Properties<TaniOnerisiDurumu>().HaveConversion<string>().HaveMaxLength(20);
     }
 
     protected override void OnModelCreating(ModelBuilder model)
@@ -93,8 +95,12 @@ public sealed class KlinikDbContext(DbContextOptions<KlinikDbContext> options) :
             // RandevuId ↔ Randevu.OnAnamnezId döngüsel FK olmasın diye RandevuId yalnızca değer olarak tutulur.
         });
 
-        model.Entity<Muayene>()
-            .HasOne<Randevu>().WithOne().HasForeignKey<Muayene>(x => x.RandevuId).OnDelete(DeleteBehavior.Restrict);
+        model.Entity<Muayene>(e =>
+        {
+            e.HasOne<Randevu>().WithOne().HasForeignKey<Muayene>(x => x.RandevuId).OnDelete(DeleteBehavior.Restrict);
+            // Kapanışla eşzamanlı not/tanı yazımı reddedilir: 103 paketi kapanıştaki kayıtla aynı kalsın.
+            e.Property(x => x.Durum).IsConcurrencyToken();
+        });
 
         model.Entity<TahlilTanimi>().HasIndex(x => x.LoincKodu).IsUnique();
 
@@ -112,6 +118,15 @@ public sealed class KlinikDbContext(DbContextOptions<KlinikDbContext> options) :
             // Muayene başına en fazla bir reddedilmemiş epikriz: eşzamanlı iki "oluştur" iki taslak yazamaz.
             e.HasIndex(x => x.MuayeneId).IsUnique().HasFilter("\"Durum\" <> 'Reddedildi'");
             // Eşzamanlı iki karardan ikincisi birincinin üzerine yazmasın (oku-kontrol-yaz, Randevu ile aynı).
+            e.Property(x => x.Durum).IsConcurrencyToken();
+        });
+
+        model.Entity<TaniOnerisi>(e =>
+        {
+            e.HasOne<Muayene>().WithMany().HasForeignKey(x => x.MuayeneId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Hekim>().WithMany().HasForeignKey(x => x.OnaylayanHekimId).OnDelete(DeleteBehavior.Restrict);
+            // Epikriz ile aynı: muayene başına en fazla bir reddedilmemiş öneri, eşzamanlı ikinci karar reddedilir.
+            e.HasIndex(x => x.MuayeneId).IsUnique().HasFilter("\"Durum\" <> 'Reddedildi'");
             e.Property(x => x.Durum).IsConcurrencyToken();
         });
 

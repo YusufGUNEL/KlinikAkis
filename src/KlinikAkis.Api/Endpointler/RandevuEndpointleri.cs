@@ -222,7 +222,7 @@ public static class RandevuEndpointleri
                 var epikrizOnayli = await db.Epikrizler.AnyAsync(x => x.MuayeneId == muayene.Id && x.Durum == EpikrizDurumu.Onaylandi, ct);
                 var takipNo = await db.Kabuller.Where(k => k.RandevuId == randevu.Id).Select(k => k.TakipNo).FirstOrDefaultAsync(ct);
                 db.OutboxMesajlari.Add(OutboxGonderici.Paket(PaketTipi.Muayene, randevu.Hasta!.TakmaAd,
-                    new { takipNo, brans = randevu.Hekim!.Brans!.Kod.ToString(), muayeneZamani = muayene.BaslangicZamani, epikrizOnayli },
+                    new { takipNo, brans = randevu.Hekim!.Brans!.Kod.ToString(), muayeneZamani = muayene.BaslangicZamani, epikrizOnayli, tanilar = muayene.Tanilar },
                     simdi));
                 break;
             case RandevuEylemi.Iptal:

@@ -22,6 +22,9 @@ public sealed record TahlilAiSonucu(AiKaynak Kaynak, string Aciklama, string? Mo
 /// <summary>Epikriz taslağı: modelin (ya da yedeğin) cümleleri + kodda kurulan alerji/tahlil satırları.</summary>
 public sealed record EpikrizAiSonucu(AiKaynak Kaynak, EpikrizTaslagi Taslak, string? Model = null, bool KotaDoldu = false);
 
+/// <summary>ICD-10 önerisi: kodlar her dalda kapalı listeden; yedekte boş olabilir.</summary>
+public sealed record TaniAiSonucu(AiKaynak Kaynak, TaniOnerisiYaniti Oneri, string? Model = null, bool KotaDoldu = false);
+
 /// <summary>
 /// Her LLM çağrısının geçtiği tek yol (SPEC §9.1): maskeleme → kural kontrolü → kota → IChatClient (JSON şema,
 /// zaman aşımı) → sunucu doğrulaması → (hata/geçersiz/zaman aşımı) kural tabanlı yedek → denetim kaydı.
@@ -34,15 +37,19 @@ public sealed class AiHatti(
     public const string OnAnamnezIstemSurumu = "onanamnez.v1";
     public const string TahlilIstemSurumu = "tahlil.v1";
     public const string EpikrizIstemSurumu = "epikriz.v1";
+    public const string TaniIstemSurumu = "tani.v1";
     public const string KotaNedeni = "kota";
     private const int OnAnamnezMaxToken = 1500;
     private const int TahlilMaxToken = 400;
     // Daha güçlü model düşünme belirteçleri de harcayabilir; üç kısa alan için pay bırakılır.
     private const int EpikrizMaxToken = 2000;
+    private const int TaniMaxToken = 600;
 
     private static readonly string OnAnamnezIstemSablonu = IstemOku(OnAnamnezIstemSurumu);
     private static readonly string TahlilIstemi = IstemOku(TahlilIstemSurumu);
     private static readonly string EpikrizIstemi = IstemOku(EpikrizIstemSurumu);
+    private static readonly string TaniIstemi = IstemOku(TaniIstemSurumu).Replace("{{KODLAR}}",
+        string.Join('\n', Icd10Listesi.Tum.Select(k => $"- {k.Kod}: {k.Ad}")), StringComparison.Ordinal);
 
     /// <summary>Bir model çağrısının denetim kaydına giden ortak bilgisi.</summary>
     private sealed record Cagri(
@@ -176,6 +183,43 @@ public sealed class AiHatti(
         DenetimEkle(cagri, cikti, basarili: false, yedek: true, neden);
         return new EpikrizAiSonucu(AiKaynak.Yedek, EpikrizTaslagi.Olustur(EpikrizYedekSablonu.Olustur(girdi), girdi),
             null, sonuc.KotaDoldu);
+    }
+
+    /// <summary>
+    /// ICD-10 önerisi (SPEC §9.10): epikrizle aynı maskeli girdi; model yalnızca kapalı listeden kod seçer (şemada enum),
+    /// sunucu listeyi ve gerekçedeki sayıları yeniden doğrular. Yedek kayıttan, kodla kurulur.
+    /// </summary>
+    public async Task<TaniAiSonucu> TaniOnerisiAsync(Hasta hasta, EpikrizGirdisi girdi, CancellationToken ct)
+    {
+        var maskeli = girdi.Maskele(hasta.Ad, hasta.Soyad).MaskeliMetin();
+        List<ChatMessage> mesajlar = [new(ChatRole.System, TaniIstemi), new(ChatRole.User, maskeli)];
+        var secenekler = new ChatOptions
+        {
+            MaxOutputTokens = TaniMaxToken,
+            Temperature = 0.2f,
+            ResponseFormat = TaniOnerisiYaniti.YanitBicimi,
+            // Epikrizle aynı: kısa JSON için düşük düşünme; düşünme belirteçleri 600 sınırını tüketip JSON'u yarım bırakmasın.
+            Reasoning = new ReasoningOptions { Effort = ReasoningEffort.Low },
+        };
+
+        var cagri = YeniCagri(AiOzellik.TaniOnerisi, TaniIstemSurumu, hasta.Id, maskeli);
+        var sonuc = await CagirAsync(cagri, mesajlar, secenekler, ct);
+        string? cikti = null;
+        var neden = sonuc.Neden;
+        if (sonuc.Yanit is { } yanit)
+        {
+            cagri = cagri with { Model = yanit.ModelId ?? cagri.Model };
+            cikti = yanit.Text;
+            (var gecerli, neden) = TaniDogrulayici.Dogrula(cikti, maskeli);
+            if (gecerli is not null)
+            {
+                DenetimEkle(cagri, gecerli.JsonOlarak(), basarili: true, yedek: false, null);
+                return new TaniAiSonucu(AiKaynak.Llm, gecerli, cagri.Model);
+            }
+        }
+
+        DenetimEkle(cagri, cikti, basarili: false, yedek: true, neden);
+        return new TaniAiSonucu(AiKaynak.Yedek, TaniYedekSablonu.Olustur(girdi), null, sonuc.KotaDoldu);
     }
 
     private Cagri YeniCagri(AiOzellik ozellik, string istemSurumu, Guid hastaId, string maskeli) =>

@@ -168,6 +168,23 @@ public sealed class Epikriz
     public DateTime? OnayZamani { get; set; }
 }
 
+/// <summary>ICD-10 kodlama önerisi (SPEC §9.10): kapalı listeden; hekim onaylayınca kodlar Muayene.Tanilar'a yazılır.</summary>
+public sealed class TaniOnerisi
+{
+    public Guid Id { get; set; }
+    public Guid MuayeneId { get; set; }
+    /// <summary>Önerilen kodlar ve gerekçeleri (JSON); kodlar her zaman Icd10Listesi'nden.</summary>
+    public string OneriJson { get; set; } = "";
+    public AiKaynak Kaynak { get; set; }
+    /// <summary>Kart başlığı (SPEC §10.2): "AI taslağı · {model} · {saat}". Yedekte boş.</summary>
+    public string? AiModel { get; set; }
+    public DateTime AiZamani { get; set; }
+    public bool KotaDoldu { get; set; }
+    public TaniOnerisiDurumu Durum { get; set; } = TaniOnerisiDurumu.Taslak;
+    public Guid? OnaylayanHekimId { get; set; }
+    public DateTime? OnayZamani { get; set; }
+}
+
 public sealed class OutboxMesaji
 {
     public Guid Id { get; set; }

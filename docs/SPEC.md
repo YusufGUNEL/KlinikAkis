@@ -148,12 +148,13 @@ gösterilir. `DateTimeOffset` kullanılmaz (SQLite sağlayıcısı sıralayamaz)
 | **Randevu** | Id, HastaId, HekimId, SlotId, Durum (§5.1), SiraNo (örn. A-017, branş+gün içinde artan), OnAnamnezId?, CagrilmaZamani? (`cagir` anı; TV son çağrıları buna göre sıralar) |
 | **Kabul** | Id, RandevuId, KabulZamani, TakipNo (`SIM-000123`, simülasyon, ASCII), KabulEden |
 | **OnAnamnez** | Id, HastaId, RandevuId? (randevu oluşunca bağlanır), SohbetJson (adım, soru, cevap), AiTaslakJson, Kaynak (`Llm` \| `Yedek` \| `Kural`), HastaOnayi (bool + hasta notu), HekimDuzeltmesi (metin?), Durum (`Sohbette`, `KirmiziBayrak`, `Taslak`, `Onaylandi`, `Duzenlendi`, `Reddedildi`), OnaylayanHekimId, OnayZamani, KirmiziBayrakKurali?, AiModel?, AiZamani?, KotaDoldu (bool). AiTaslakJson §9.5 şemasıdır; `Siddet` (`Hafif`/`Orta`/`Siddetli`) ve `Aciliyet` (`Rutin`/`Oncelikli`) enum'ları oradan gelir ve değerlerini kod belirler |
-| **Muayene** | Id, RandevuId, BaslangicZamani, HekimNotu, Tanilar (ICD-10 kod listesi, artı aşamada), Durum (`Acik`, `Kapali`) |
+| **Muayene** | Id, RandevuId, BaslangicZamani, HekimNotu, Tanilar (hekimin onayladığı ICD-10 kodları, kapalı listeden, §9.10), Durum (`Acik`, `Kapali`) |
 | **TahlilTanimi** | Id, Ad, HastaDostuAd ("Şeker ortalaması"), LoincKodu, Birim, AltSinir, UstSinir, CinsiyeteGore (K/E ayrı aralık), KritikAlt?, KritikUst?, Not ("örnek aralık, laboratuvara göre değişir"), Ondalik (gösterim basamağı: "7,0", "128") |
 | **TahlilSonucu** | Id, HastaId, TahlilTanimiId, Deger (decimal), Zaman, Isaret (kodla hesaplanır: `Normal`, `Yuksek`, `Dusuk`, `KritikYuksek`, `KritikDusuk`), AiAciklamaTaslak, AciklamaKaynak? (`Llm`/`Yedek`), AiModel?, AiZamani?, KotaDoldu (kart başlığı, §10.2), YayinlananAciklama?, HastayaYayinlandi (bool + zaman + hekim) |
 | **Epikriz** (artı) | Id, MuayeneId, AiTaslak (yapılandırılmış JSON: model yazar öykü/değerlendirme/plan; alerji ve tahlil satırları kodla eklenir), SonMetin? (hekimin düzenlediği öykü/değerlendirme/plan metni; alerji ve tahlil satırları düzenlenmez, AiTaslak'tan basılır), Kaynak, Durum (`Taslak`, `Onaylandi`, `Reddedildi`), OnaylayanHekimId, OnayZamani?, AiModel?, AiZamani, KotaDoldu (kart başlığı, §10.2) |
+| **TaniOnerisi** (artı) | Id, MuayeneId, OneriJson (`[{kod, gerekce}]`, 0-3 madde, kodlar kapalı listeden), Kaynak (`Llm`/`Yedek`), AiModel?, AiZamani, KotaDoldu, Durum (`Taslak`, `Onaylandi`, `Reddedildi`), OnaylayanHekimId?, OnayZamani? · muayene başına en fazla bir reddedilmemiş öneri |
 | **OutboxMesaji** (artı) | Id, PaketTipi (101 Hasta Kayıt, 103 Muayene, 105 Lab Sonuç), HastaTakmaAdi, PayloadJson, Durum (`Bekliyor`, `Gonderildi`, `IsKuraliHatasi`), Deneme, Zaman, Hata |
-| **AiAuditLog** | Id, Zaman, Ozellik (`OnAnamnez`, `TahlilAciklama`, `Epikriz`), HastaId? (panel süzgeci; modele gitmez), Saglayici (`Gemini`/`Ollama`/`Fake`/`Kural`), Model, IstemSurumu, MaskeliGirdi (metin), GirdiHash (SHA-256), CiktiJson, GecikmeMs, Basarili, YedegeDustu (bool), Neden? ("zaman aşımı", "geçersiz bölüm", "kota", kural adı) |
+| **AiAuditLog** | Id, Zaman, Ozellik (`OnAnamnez`, `TahlilAciklama`, `Epikriz`, `TaniOnerisi`), HastaId? (panel süzgeci; modele gitmez), Saglayici (`Gemini`/`Ollama`/`Fake`/`Kural`), Model, IstemSurumu, MaskeliGirdi (metin), GirdiHash (SHA-256), CiktiJson, GecikmeMs, Basarili, YedegeDustu (bool), Neden? ("zaman aşımı", "geçersiz bölüm", "kota", kural adı) |
 | **ErisimKaydi** | Id, Zaman, KullaniciRol, KullaniciAd, HastaId, Eylem (tam cümle: "Hasta kaydını görüntüledi", "Ön anamnezi onayladı / düzenledi / reddetti", sonraki aşamalarda "… yayınladı") |
 
 **SQLite notu:** SQLite sağlayıcısı `decimal` üzerinde sıralama/karşılaştırma yapamaz. `OnModelCreating`
@@ -171,7 +172,7 @@ Planlandi ──kabul──► KabulEdildi ──cagir──► Cagrildi ──b
 - `basla` bir `Muayene` kaydı açar; `kapat` muayeneyi kapatır ve 103 paketini kuyruğa ekler.
 
 ### 5.2 Outbox paket tetikleyicileri (simülasyon)
-- `kabul` → 101 Hasta Kayıt · `kapat` → 103 Muayene (epikriz onaylı mı bilgisiyle; epikriz metni gitmez) ·
+- `kabul` → 101 Hasta Kayıt · `kapat` → 103 Muayene (epikriz onaylı mı bilgisiyle ve onaylı ICD-10 kodlarıyla; epikriz metni gitmez) ·
   `yayinla` → 105 Lab Sonuç (**yayın başına tek paket**, sonuçlar listede). Paketlerde kimlik yok, yalnızca takma ad.
 - `OutboxIsleyici` (`BackgroundService`, saniyede bir) 2 sn sonra "gönderir" → `Gonderildi`; değişiklikte
   `OutboxGuncellendi` (demo grubu). Gönderim mantığı Infrastructure'da `OutboxGonderici.IsleAsync(simdi)`.
@@ -256,6 +257,9 @@ Tümü `/api` altında, JSON. Hata formatı ProblemDetails. Rol kontrolü JWT cl
 | GET | `/hastalar/{id}/erisim` | doktor | Erişim kaydı listesi |
 | POST | `/muayeneler/{id}/epikriz` | doktor | (artı) Epikriz taslağı (bekleyen taslak varsa model yeniden çağrılmaz, o döner); vizit kapalıysa 409 |
 | POST | `/epikriz/{id}/karar` | doktor | (artı) `onayla` / `duzenle` / `reddet`; vizit kapalıysa 409 (103 kapanışta gitti) |
+| POST | `/muayeneler/{id}/tani-onerisi` | doktor | (artı) ICD-10 önerisi (§9.10; bekleyen öneri varsa model yeniden çağrılmaz); vizit kapalıysa 409 |
+| POST | `/tani-onerisi/{id}/karar` | doktor | (artı) `onayla` (önerilen kodlar) / `duzenle` (`kodlar`, kapalı listeden 1-5) / `reddet`; onayda `Muayene.Tanilar` yazılır; erişim kaydı; vizit kapalıysa 409 |
+| GET | `/icd10` | doktor | (artı) ICD-10 kapalı listesi (Düzenle seçimi) |
 | GET | `/outbox?takmaAd=` | doktor, kabul | (artı) Gönderim kutusu (son 50, en yeni ilk; takmaAd ile süzülür) |
 | POST | `/outbox/{id}/yeniden-dene` | doktor, kabul | (artı) Yalnız `IsKuraliHatasi` → `Bekliyor`; değilse 409 |
 | GET | `/health` | herkes | Isıtma / sağlık kontrolü (DB ping dahil) |
@@ -392,7 +396,7 @@ SDK şemayı yerel olarak iletmiyorsa: şema istemde verilir, doğrulama zaten z
 - Eval'de 2 enjeksiyon vakası bulunur (§13 Aşama 10).
 
 ### 9.9 Maliyet ve kötüye kullanım
-- Herkese açık URL'de LLM uç noktaları (`ozet`, `aciklama`, `epikriz`) ASP.NET Core rate limiter ile
+- Herkese açık URL'de LLM uç noktaları (`ozet`, `aciklama`, `epikriz`, `tani-onerisi`) ASP.NET Core rate limiter ile
   IP başına dakikada 10 istek; aşımda 429 ProblemDetails.
 - Günlük toplam LLM çağrı kotası `AI:GunlukLimit` (varsayılan 300). Aşılınca o gün model çağrılmaz; taslak
   hastanın kendi cevaplarından kural tabanlı yedekle üretilir + kartta "demo kotası doldu · otomatik taslak"
@@ -400,6 +404,19 @@ SDK şemayı yerel olarak iletmiyorsa: şema istemde verilir, doğrulama zaten z
   onaylanıp kayda geçebilirdi.) Kota yalnızca gerçek sağlayıcı çağrılarını sayar; `Fake` modda sayılmaz.
 - Gemini ücretsiz katmanı kullanılır, projede faturalandırma açılmaz → ücret oluşamaz. Gemini 429 (kota)
   dönerse günlük kota kuralıyla aynı davranılır: kural tabanlı yedek + "demo kotası" rozeti, `Neden=kota`.
+
+### 9.10 ICD-10 önerisi (artı, Aşama 8)
+- **Kapalı liste** Domain'de (`Icd10Listesi`, 26 kod): DSÖ ICD-10 2019 (Türkiye'deki ICD-10 Türkçe sürümünün dayandığı DSÖ sınıflaması; ICD-10-CM değil),
+  her kod DSÖ tablosunda uç kod (DSÖ ICD-10 tarayıcısının JSON ucundan doğrulandı, 31.10.2026). Senaryo belirtileri
+  (R grubu) + sık poliklinik tanıları.
+- Girdi epikrizle aynı maskeli metin (kayıt + kodla işaretli tahliller + yalnızca hekim onaylı ön anamnez + hekim notu).
+- Çıktı: `{ "oneriler": [{ "kod": "<liste>", "gerekce": "string" }] }`; şemada `kod` için `enum` (listedeki kodlar),
+  0-3 madde (dayanak yoksa boş liste; model kod seçmeye zorlanmaz). Sunucu: listede olmayan / tekrarlı kod, 3'ten fazla
+  madde, boş ya da 300 karakterden uzun gerekçe, girdide olmayan sayı → yedek.
+- Yedek (kodla, kayıttan): kronik hastalık eşlemesi (Tip 2 diyabet → E11.9, hipotiroidi → E03.9, hipertansiyon → I10…),
+  kodla verilmiş tahlil işareti (HbA1c/glukoz ▲ → R73.9, Hb ▼ → D64.9), onaylı anamnezdeki belirtiler (R grubu; dar kökler, olumsuz cümlecik atlanır, ateş eşlenmez). En fazla 3; dayanak yoksa boş, hekim Düzenle ile listeden seçer.
+- Arayüz: Epikriz sekmesinde "Tanı kodları (ICD-10)" — mor/kesik kart (§10.2), Onayla / Düzenle (kapalı listeden çoklu
+  seçim, serbest kod yok) / Reddet. Sabit not: "Kodlama önerisidir; tanıyı hekim koyar."
 
 ---
 
@@ -727,6 +744,8 @@ Zaman daralırsa sıra: Aşama 0-6 + 9 kesin; 7'nin ilk maddesi (epikriz); geri 
 ### 13.8 Artılar II
 SUT ön kontrolü (3-5 kural) **ya da** kapalı listeden ICD-10 önerisi (LLM yalnızca listeden seçer,
 sunucu doğrular). Claude ikisinin artı/eksisini 3'er maddeyle anlatır, kullanıcı seçer.
+**Seçilen (31.10.2026): ICD-10 önerisi** (§9.10). Gerekçe: ana ilkeyi (enum şema + sunucu doğrulaması + yedek) yeniden
+gösterir ve mevcut altyapıyı kullanır; uydurma bir SUT kuralı görüşmede yakalanabilirdi.
 
 ### 13.9 Cila
 §11'deki tüm testler; tüm ekranlarda boş/yükleniyor/hata; Türkçe biçim taraması (uppercase pipe,

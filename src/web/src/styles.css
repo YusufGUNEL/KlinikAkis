@@ -36,6 +36,13 @@ body {
   }
 }
 
+/* Açılır listelerde klavyeyle gezilen seçenek: PrimeNG'nin seçili+odaklı zemini saydam, odaklı zemini beyaza
+   1,1:1 kalıyordu (WCAG 2.4.7). Seçenek listede focus almadığı için focus-visible değil p-focus sınıfı. */
+.p-multiselect-option.p-focus {
+  outline: 2px solid var(--color-ana);
+  outline-offset: -2px;
+}
+
 /* İkincil (outlined) butonlar: PrimeNG varsayılanı mor kart zemininde 4,38:1 kalıyordu (SPEC §10.1 AA). */
 .p-button.p-button-outlined.ikincil,
 .p-button.p-button-text.ikincil {

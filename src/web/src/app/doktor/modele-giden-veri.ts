@@ -47,6 +47,10 @@ export function saglayiciEtiketi(saglayici: string): string {
           } @else if (d.ozellik === 'Epikriz') {
             <span class="text-basari" aria-hidden="true">✓ </span>Ad, TC, telefon maskelendi · yalnızca hekim onaylı ön anamnez gitti ·
             alerji ve tahlil satırları kodla eklendi
+          } @else if (d.ozellik === 'TaniOnerisi') {
+            <span class="text-basari" aria-hidden="true">✓ </span>Ad, TC, telefon maskelendi · yalnızca hekim onaylı ön anamnez gitti ·
+            model yalnızca kapalı ICD-10 listesinden seçebilir ·
+            {{ d.yedegeDustu ? 'model yanıtı kullanılmadı, kodlar kayıttan kodla seçildi' : 'kodlar sunucuda yeniden doğrulandı' }}
           } @else if (d.saglayici === 'Kural') {
             <span class="font-medium text-tehlike"><span aria-hidden="true">‼ </span>Kırmızı bayrak kuralı: {{ kuralEtiketi[d.neden ?? ''] ?? d.neden }} · model çağrılmadı</span>
           } @else {

@@ -24,9 +24,18 @@ import { TahlillerSekmesi } from './tahliller-sekmesi';
 const QR_HASTA_ID = 'a1000000-0000-0000-0000-000000000001';
 const DOKTOR_EYLEMLERI: RandevuEylemi[] = ['Cagir', 'Basla', 'Kapat'];
 type Sekme = 'ozet' | 'tahliller' | 'epikriz';
-/** Sekmeye göre "Modele giden veri" panelinin gösterdiği AI özelliği. */
-const SEKME_OZELLIGI: Record<Sekme, string> = { ozet: 'OnAnamnez', tahliller: 'TahlilAciklama', epikriz: 'Epikriz' };
-const OZELLIK_ADI: Record<string, string> = { OnAnamnez: 'ön anamnez', TahlilAciklama: 'tahlil açıklaması', Epikriz: 'epikriz' };
+/** Sekmeye göre "Modele giden veri" panelinin gösterdiği AI özellikleri (Epikriz sekmesinde ICD-10 önerisi de var). */
+const SEKME_OZELLIKLERI: Record<Sekme, string[]> = {
+  ozet: ['OnAnamnez'],
+  tahliller: ['TahlilAciklama'],
+  epikriz: ['Epikriz', 'TaniOnerisi'],
+};
+const OZELLIK_ADI: Record<string, string> = {
+  OnAnamnez: 'ön anamnez',
+  TahlilAciklama: 'tahlil açıklaması',
+  Epikriz: 'epikriz',
+  TaniOnerisi: 'ICD-10 önerisi',
+};
 
 /**
  * Doktor çalışma alanı, 3 sütun (taslak 4, Epic Storyboard düzeni): sol günün listesi (canlı), orta hasta
@@ -323,12 +332,12 @@ export class Doktor {
   });
   // Panel seçili kartın çağrısını göstersin: hastanın sonradan başlattığı başka bir sohbetin kaydını değil.
   // Taslak zamanı hat bittikten sonra yazılır; kartın kaydı o andan önceki en yeni kayıttır (liste yeniden eskiye).
-  // Tahliller ve Epikriz sekmelerinde o özelliğin son çağrısı gösterilir.
+  // Tahliller ve Epikriz sekmelerinde o sekmenin özelliklerinden en son çağrı gösterilir.
   protected readonly sonDenetim = computed(() => {
     if (!this.denetim.hasValue()) return null;
-    const ozellik = SEKME_OZELLIGI[this.sekme()];
-    const kayitlar = this.denetim.value().filter((k) => k.ozellik === ozellik);
-    if (ozellik !== 'OnAnamnez') return kayitlar[0] ?? null;
+    const ozellikler = SEKME_OZELLIKLERI[this.sekme()];
+    const kayitlar = this.denetim.value().filter((k) => ozellikler.includes(k.ozellik));
+    if (this.sekme() !== 'ozet') return kayitlar[0] ?? null;
     const kartZamani = this.detay.hasValue() ? this.detay.value().kart?.zaman : undefined;
     if (!kartZamani) return kayitlar[0] ?? null;
     const sinir = Date.parse(kartZamani);

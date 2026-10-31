@@ -43,6 +43,7 @@ public sealed class FakeChatClient : IChatClient
             {
                 TahlilAciklamaYaniti.SemaAdi => TahlilYaniti(kullaniciMetni),
                 EpikrizYaniti.SemaAdi => EpikrizYanitiUret(kullaniciMetni),
+                TaniOnerisiYaniti.SemaAdi => TaniYaniti(kullaniciMetni),
                 _ => HazirYanit(kullaniciMetni),
             };
         return new ChatResponse(new ChatMessage(ChatRole.Assistant, json)) { ModelId = ModelAdi };
@@ -106,6 +107,25 @@ public sealed class FakeChatClient : IChatClient
             plan = "Plan hekim tarafından belirlenecek.",
         };
         return JsonSerializer.Serialize(yanit, Json);
+    }
+
+    /// <summary>ICD-10 önerisi: istemdeki kronik hastalık, kodla işaretli tahlil ve ön anamnez satırlarından; yalnız listeden.</summary>
+    private static string TaniYaniti(string metin)
+    {
+        var katli = TurkceMetin.Katla(metin);
+        var oneriler = new List<object>();
+        void Ekle(bool kosul, string kod, string gerekce)
+        {
+            if (kosul && oneriler.Count < TaniOnerisiYaniti.EnFazlaOneri) oneriler.Add(new { kod, gerekce });
+        }
+        Ekle(TurkceMetin.KokVar(katli, "tip 2 diyabet"), "E11.9", "Kayıttaki kronik hastalık: Tip 2 diyabet.");
+        Ekle(metin.Contains("HbA1c:", StringComparison.Ordinal) && metin.Contains("▲ Y", StringComparison.Ordinal),
+            "R73.9", "HbA1c ▲ Y (işaret kodla hesaplandı).");
+        Ekle(TurkceMetin.KokVar(katli, "cok su ic"), "R63.1", "Girdide çok su içme geçiyor.");
+        Ekle(TurkceMetin.KokVar(katli, "bogaz agri"), "R07.0", "Girdide boğaz ağrısı geçiyor.");
+        Ekle(TurkceMetin.KokVar(katli, "kulak agri"), "H92.0", "Girdide kulak ağrısı geçiyor.");
+        // Dayanak yoksa boş liste (istem kuralı); hekim Düzenle ile listeden seçer.
+        return JsonSerializer.Serialize(new { oneriler }, Json);
     }
 
     private static string HazirYanit(string metin)

@@ -8,7 +8,8 @@ using Microsoft.Extensions.AI;
 namespace KlinikAkis.Infrastructure.Ai;
 
 /// <summary>Epikrize giren bir tahlil satırı: değer ve işaret koddan (TahlilDegerlendirici), model yorumlamaz.</summary>
-public sealed record EpikrizTahlili(string Ad, decimal Deger, string Birim, decimal Alt, decimal Ust, Isaret Isaret, int Ondalik)
+/// <param name="Loinc">ICD-10 yedeğinde testi ada göre değil koda göre tanımak için; modele giden satırda yer almaz.</param>
+public sealed record EpikrizTahlili(string Ad, decimal Deger, string Birim, decimal Alt, decimal Ust, Isaret Isaret, int Ondalik, string? Loinc = null)
 {
     private string Sayi(decimal d) => TurkceMetin.Sayi(d, Ondalik);
 
@@ -115,11 +116,19 @@ public static partial class EpikrizDogrulayici
         string?[] alanlar = [y.Oyku, y.Degerlendirme, y.Plan];
         if (alanlar.Any(string.IsNullOrWhiteSpace)) return (null, BosAlan);
         if (alanlar.Any(a => a!.Trim().Length > AlanSiniri)) return (null, Uzun);
-        // İzinli sayılar: modele giden metinde geçen her sayı (tahlil değerleri, aralıklar, nottaki sayılar).
-        var izinli = Sayilar(maskeliGirdi).ToHashSet();
-        if (alanlar.Any(a => !Sayilar(a!).All(d => izinli.Contains(d) || (d is >= 1 and <= 3 && d == decimal.Truncate(d)))))
+        if (!alanlar.All(a => SayilarGirdide(a!, maskeliGirdi)))
             return (null, UydurmaSayi);
         return (new EpikrizYaniti(y.Oyku.Trim(), y.Degerlendirme.Trim(), y.Plan.Trim()), null);
+    }
+
+    /// <summary>
+    /// Metindeki her sayı modele giden metinde geçiyor mu (tahlil değerleri, aralıklar, nottaki sayılar); 1-3 arası
+    /// tam sayı serbest. ICD-10 gerekçesi de aynı kuralla denetlenir.
+    /// </summary>
+    internal static bool SayilarGirdide(string metin, string maskeliGirdi)
+    {
+        var izinli = Sayilar(maskeliGirdi).ToHashSet();
+        return Sayilar(metin).All(d => izinli.Contains(d) || (d is >= 1 and <= 3 && d == decimal.Truncate(d)));
     }
 
     /// <summary>Sayılar; harften sonra gelen rakamlar ("HbA1c", "B12") sayı değildir, birim önündekiler ("1500mg") sayıdır.</summary>
@@ -129,7 +138,7 @@ public static partial class EpikrizDogrulayici
     [GeneratedRegex(@"(?<![\p{L}\d,.])\d+(?:[,.]\d+)?(?!\d)")]
     private static partial Regex SayiDeseni();
 
-    private static string KodBloguSoy(string? metin)
+    internal static string KodBloguSoy(string? metin)
     {
         var s = (metin ?? "").Trim();
         if (!s.StartsWith("```", StringComparison.Ordinal)) return s;

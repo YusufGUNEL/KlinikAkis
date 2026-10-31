@@ -319,4 +319,33 @@ export interface MuayeneDetayi {
   durum: 'Acik' | 'Kapali';
   hekimNotu: string | null;
   epikriz: EpikrizKarti | null;
+  /** Hekimin onayladığı ICD-10 kodları. */
+  tanilar: Icd10Kodu[];
+  taniOnerisi: TaniOnerisiKarti | null;
+}
+
+/** Kapalı ICD-10 listesinden bir kod (DSÖ ICD-10 2019); sunucudaki Icd10Listesi tek kaynaktır. */
+export interface Icd10Kodu {
+  kod: string;
+  ad: string;
+}
+
+export type TaniOnerisiDurumu = 'Taslak' | 'Onaylandi' | 'Reddedildi';
+
+export interface TaniOnerisiSatiri {
+  kod: string;
+  ad: string;
+  gerekce: string;
+}
+
+export interface TaniOnerisiKarti {
+  id: string;
+  durum: TaniOnerisiDurumu;
+  kaynak: AiKaynak;
+  model: string | null;
+  zaman: string;
+  kotaDoldu: boolean;
+  /** Yedekte boş olabilir: hekim Düzenle ile listeden seçer. */
+  oneriler: TaniOnerisiSatiri[];
+  karar: { durum: TaniOnerisiDurumu; hekimAd: string; zaman: string } | null;
 }

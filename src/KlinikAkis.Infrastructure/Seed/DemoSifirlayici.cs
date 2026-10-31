@@ -57,6 +57,7 @@ public sealed class DemoSifirlayici(KlinikDbContext db, TimeProvider zaman, ILog
         await db.AiAuditLoglari.ExecuteDeleteAsync(ct);
         await db.OutboxMesajlari.ExecuteDeleteAsync(ct);
         await db.Epikrizler.ExecuteDeleteAsync(ct);
+        await db.TaniOnerileri.ExecuteDeleteAsync(ct);
         await db.Muayeneler.ExecuteDeleteAsync(ct);
         await db.Kabuller.ExecuteDeleteAsync(ct);
         await db.Randevular.ExecuteDeleteAsync(ct);
