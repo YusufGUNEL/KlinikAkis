@@ -11,6 +11,7 @@ public static class OlayTuru
     public const string HastaCagrildi = nameof(HastaCagrildi);
     public const string OnAnamnezHazir = nameof(OnAnamnezHazir);
     public const string OnAnamnezKarar = nameof(OnAnamnezKarar);
+    public const string TahlilYayinlandi = nameof(TahlilYayinlandi);
     public const string DemoSifirlandi = nameof(DemoSifirlandi);
 }
 

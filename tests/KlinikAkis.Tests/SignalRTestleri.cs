@@ -65,6 +65,30 @@ public sealed class SignalRTestleri(KlinikApiFabrikasi fabrika) : IClassFixture<
     }
 
     [Fact]
+    public async Task Tahlil_yayinlaninca_hastanin_grubuna_TahlilYayinlandi_gider_baska_hastaya_gitmez()
+    {
+        var (hastaBaglantisi, hastaOlaylari) = await BaglanAsync("hasta", SenaryoIdleri.Elif);
+        var (baskaBaglanti, baskaOlaylar) = await BaglanAsync("hasta", SenaryoIdleri.Ayse);
+        await using var _1 = hastaBaglantisi;
+        await using var _2 = baskaBaglanti;
+
+        var hekim = await fabrika.GirisYapAsync("doktor", SenaryoIdleri.HekimEndokrinoloji);
+        var satirlar = JsonDocument.Parse(await hekim.GetStringAsync($"/api/hastalar/{SenaryoIdleri.Elif}/tahliller")).RootElement;
+        var tsh = satirlar.EnumerateArray().Single(s => s.GetProperty("loincKodu").GetString() == "3016-3")
+            .GetProperty("son").GetProperty("id").GetGuid();
+        (await hekim.PostAsJsonAsync("/api/tahliller/yayinla",
+            new { sonuclar = new[] { new { sonucId = tsh, aciklama = "Tiroid hormonunuz aralığın üstünde." } } }))
+            .EnsureSuccessStatusCode();
+
+        using var zaman = new CancellationTokenSource(Bekleme);
+        var olay = await hastaOlaylari.Reader.ReadAsync(zaman.Token);
+        Assert.Equal("TahlilYayinlandi", olay.GetProperty("tur").GetString());
+        Assert.Equal(["tur", "id"], olay.EnumerateObject().Select(p => p.Name));
+        await Task.Delay(500);
+        Assert.False(baskaOlaylar.Reader.TryRead(out _));
+    }
+
+    [Fact]
     public async Task Tokensiz_baglanti_reddedilir()
     {
         var baglanti = new HubConnectionBuilder()

@@ -181,16 +181,17 @@ public static class DemoVeriTohumu
     private static List<TahlilTanimi> TahlilTanimlari() =>
     [
         new() { Id = SenaryoIdleri.HbA1c, Ad = "HbA1c", HastaDostuAd = "Şeker ortalaması", LoincKodu = "4548-4",
-            Birim = "%", AltSinir = 4.0m, UstSinir = 5.6m },
+            Birim = "%", AltSinir = 4.0m, UstSinir = 5.6m, Ondalik = 1 },
         new() { Id = SenaryoIdleri.AclikGlukozu, Ad = "Glukoz (açlık)", HastaDostuAd = "Açlık kan şekeri", LoincKodu = "1558-6",
-            Birim = "mg/dL", AltSinir = 70m, UstSinir = 100m, KritikAlt = 40m, KritikUst = 400m },
-        new() { Id = SenaryoIdleri.Hemoglobin, Ad = "Hemoglobin", HastaDostuAd = "Kan değeri (hemoglobin)", LoincKodu = "718-7",
+            Birim = "mg/dL", AltSinir = 70m, UstSinir = 100m, KritikAlt = 40m, KritikUst = 400m, Ondalik = 0 },
+        new() { Id = SenaryoIdleri.Hemoglobin, Ad = "Hemoglobin", HastaDostuAd = "Kan değeri", LoincKodu = "718-7",
             Birim = "g/dL", AltSinir = 12.0m, UstSinir = 15.5m, CinsiyeteGore = true, ErkekAltSinir = 13.5m, ErkekUstSinir = 17.5m,
-            KritikAlt = 7.0m, KritikUst = 20.0m },
+            KritikAlt = 7.0m, KritikUst = 20.0m, Ondalik = 1 },
         new() { Id = SenaryoIdleri.Ferritin, Ad = "Ferritin", HastaDostuAd = "Demir deposu", LoincKodu = "2276-4",
-            Birim = "ng/mL", AltSinir = 15m, UstSinir = 150m, CinsiyeteGore = true, ErkekAltSinir = 30m, ErkekUstSinir = 400m },
-        new() { Id = SenaryoIdleri.Tsh, Ad = "TSH", HastaDostuAd = "Tiroid hormonu (TSH)", LoincKodu = "3016-3",
-            Birim = "mIU/L", AltSinir = 0.4m, UstSinir = 4.0m },
+            Birim = "ng/mL", AltSinir = 15m, UstSinir = 150m, CinsiyeteGore = true, ErkekAltSinir = 30m, ErkekUstSinir = 400m,
+            Ondalik = 0 },
+        new() { Id = SenaryoIdleri.Tsh, Ad = "TSH", HastaDostuAd = "Tiroid hormonu", LoincKodu = "3016-3",
+            Birim = "mIU/L", AltSinir = 0.4m, UstSinir = 4.0m, Ondalik = 2 },
     ];
 
     private static List<TahlilSonucu> SenaryoTahlilleri(List<TahlilTanimi> tanimlar, List<Hasta> hastalar, DateTime utcSimdi)
@@ -203,14 +204,19 @@ public static class DemoVeriTohumu
         var cinsiyet = hastalar.ToDictionary(h => h.Id, h => h.Cinsiyet);
         var liste = new List<TahlilSonucu>();
 
+        // Bugünden önceki sonuçlar hastaya önceki vizitlerde yayınlanmış sayılır (açıklamasız): hasta trendi görür.
+        // Bu sabahki sonuçlar yayınlanmamıştır; hekim açıklamayla birlikte yayınlar (SPEC §9.6).
         void Ekle(Guid hastaId, Guid tanimId, decimal deger, DateTime zaman)
         {
             var t = tanim[tanimId];
+            var onceki = zaman < sabah;
             liste.Add(new TahlilSonucu
             {
                 Id = DeterministikGuid.Uret("tahlil", hastaId, tanimId, liste.Count),
                 HastaId = hastaId, TahlilTanimiId = tanimId, Deger = deger, Zaman = zaman,
                 Isaret = TahlilDegerlendirici.Degerlendir(t, cinsiyet[hastaId], deger),
+                HastayaYayinlandi = onceki,
+                YayinZamani = onceki ? zaman.AddDays(1) : null,
             });
         }
 
@@ -221,8 +227,8 @@ public static class DemoVeriTohumu
         Ekle(SenaryoIdleri.Ayse, SenaryoIdleri.AclikGlukozu, 128m, sabah);
         Ekle(SenaryoIdleri.Ayse, SenaryoIdleri.Hemoglobin, 13.1m, sabah);
 
-        // Senaryo 3 — Zeynep: Hb düşük, ferritin düşük.
-        Ekle(SenaryoIdleri.Zeynep, SenaryoIdleri.Hemoglobin, 10.2m, sabah.AddMinutes(10));
+        // Senaryo 3 — Zeynep: Hb kritik düşük (‼ KD, kritik alt 7,0; §10.3 penceresi), ferritin düşük.
+        Ekle(SenaryoIdleri.Zeynep, SenaryoIdleri.Hemoglobin, 6.8m, sabah.AddMinutes(10));
         Ekle(SenaryoIdleri.Zeynep, SenaryoIdleri.Ferritin, 8m, sabah.AddMinutes(10));
 
         // Senaryo 5 — Elif: TSH yüksek.

@@ -33,3 +33,6 @@ public enum AiOzellik { OnAnamnez, TahlilAciklama, Epikriz }
 public enum Siddet { Hafif, Orta, Siddetli }
 
 public enum Aciliyet { Rutin, Oncelikli }
+
+/// <summary>Kritik değer hastaya yayınlanırken hekimin zorunlu seçimi (SPEC §10.3); erişim kaydına yazılır.</summary>
+public enum BilgilendirmeSecimi { TelefonlaBilgilendirildi, Bilgilendirilecek }

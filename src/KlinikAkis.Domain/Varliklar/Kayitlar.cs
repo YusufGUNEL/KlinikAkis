@@ -120,6 +120,8 @@ public sealed class TahlilTanimi
     public decimal? KritikAlt { get; set; }
     public decimal? KritikUst { get; set; }
     public string Not { get; set; } = "Örnek aralık, laboratuvara göre değişir.";
+    /// <summary>Gösterim basamağı ("7,0", "128", "0,40"); ekranda ve açıklama cümlesinde aynı biçim.</summary>
+    public int Ondalik { get; set; } = 1;
 }
 
 public sealed class TahlilSonucu
@@ -132,6 +134,11 @@ public sealed class TahlilSonucu
     public DateTime Zaman { get; set; }
     public Isaret Isaret { get; set; }
     public string? AiAciklamaTaslak { get; set; }
+    /// <summary>Açıklama taslağının kart başlığı (SPEC §10.2): kaynak, model, saat; kota rozeti (§9.9).</summary>
+    public AiKaynak? AciklamaKaynak { get; set; }
+    public string? AiModel { get; set; }
+    public DateTime? AiZamani { get; set; }
+    public bool KotaDoldu { get; set; }
     public string? YayinlananAciklama { get; set; }
     public bool HastayaYayinlandi { get; set; }
     public DateTime? YayinZamani { get; set; }

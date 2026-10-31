@@ -37,4 +37,20 @@ public sealed class TahlilDegerlendiriciTestleri
         Assert.Equal(Isaret.Yuksek, TahlilDegerlendirici.Degerlendir(hba1c, Cinsiyet.K, 7.4m));
         Assert.Equal(Isaret.Yuksek, TahlilDegerlendirici.Degerlendir(hba1c, Cinsiyet.E, 7.4m));
     }
+
+    // Açlık glukozu: 70-100 · kritik ≤40 / ≥400; cinsiyetten bağımsız.
+    [Theory]
+    [InlineData(40, Isaret.KritikDusuk)]
+    [InlineData(41, Isaret.Dusuk)]
+    [InlineData(70, Isaret.Normal)]
+    [InlineData(100, Isaret.Normal)]
+    [InlineData(128, Isaret.Yuksek)]
+    [InlineData(399, Isaret.Yuksek)]
+    [InlineData(400, Isaret.KritikYuksek)]
+    public void Cinsiyetsiz_tanimda_kritik_esikler_dahildir(int deger, Isaret beklenen)
+    {
+        var glukoz = new TahlilTanimi { AltSinir = 70m, UstSinir = 100m, KritikAlt = 40m, KritikUst = 400m };
+        Assert.Equal(beklenen, TahlilDegerlendirici.Degerlendir(glukoz, Cinsiyet.K, deger));
+        Assert.Equal(beklenen, TahlilDegerlendirici.Degerlendir(glukoz, Cinsiyet.E, deger));
+    }
 }

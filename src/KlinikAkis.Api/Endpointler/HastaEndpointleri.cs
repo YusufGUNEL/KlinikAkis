@@ -19,7 +19,8 @@ public static class HastaEndpointleri
             .WithSummary("Hasta bandı: kimlik (maskeli TC), yaş, alerjiler, kronik hastalıklar, ilaçlar; erişim kaydı yazar");
 
         hastalar.MapGet("/tahliller", Tahliller).WithName("HastaTahlilleri").ProducesProblem(StatusCodes.Status404NotFound)
-            .WithSummary("Teste göre gruplu sonuçlar: hastanın cinsiyetine göre referans, son değer, kodla verilen işaret, trend");
+            .WithSummary("Teste göre gruplu sonuçlar: hastanın cinsiyetine göre referans, son değer, kodla verilen işaret, trend, " +
+                "son sonucun AI açıklama taslağı ve yayın durumu");
 
         hastalar.MapGet("/erisim", Erisim).WithName("HastaErisimKaydi")
             .WithSummary("Bu hastanın verisine kim, ne zaman, ne yaptı (yeniden eskiye, son 50)");
@@ -68,6 +69,7 @@ public static class HastaEndpointleri
             .Include(s => s.TahlilTanimi)
             .Where(s => s.HastaId == id)
             .ToListAsync(ct);
+        var hekimler = await TahlilEndpointleri.HekimAdlariAsync(db, sonuclar.Select(s => s.YayinlayanHekimId), ct);
 
         var satirlar = sonuclar
             .GroupBy(s => s.TahlilTanimiId)
@@ -75,11 +77,12 @@ public static class HastaEndpointleri
             {
                 var t = g.First().TahlilTanimi!;
                 var (alt, ust) = TahlilDegerlendirici.Aralik(t, cinsiyet.Value);
-                var trend = g.OrderBy(s => s.Zaman)
-                    .Select(s => new TahlilDegeri(s.Id, s.Deger, s.Zaman, s.Isaret, s.HastayaYayinlandi))
-                    .ToList();
+                var sirali = g.OrderBy(s => s.Zaman).ToList();
+                var trend = sirali.Select(s => new TahlilDegeri(s.Id, s.Deger, s.Zaman, s.Isaret, s.HastayaYayinlandi)).ToList();
+                var son = sirali[^1];
                 return new TahlilSatiri(t.Id, t.Ad, t.HastaDostuAd, t.LoincKodu, t.Birim, alt, ust,
-                    t.KritikAlt, t.KritikUst, t.Not, trend[^1], trend);
+                    t.KritikAlt, t.KritikUst, t.Ondalik, t.Not, trend[^1], trend,
+                    SonucAciklamasi.Olustur(son, son.YayinlayanHekimId is { } h ? hekimler.GetValueOrDefault(h) : null));
             })
             .OrderByDescending(s => s.Son.Zaman).ThenBy(s => s.LoincKodu, StringComparer.Ordinal)
             .ToList();
@@ -100,7 +103,7 @@ public sealed record HastaOzeti(
 
 public sealed record TahlilSatiri(
     Guid TahlilTanimiId, string Ad, string HastaDostuAd, string LoincKodu, string Birim,
-    decimal AltSinir, decimal UstSinir, decimal? KritikAlt, decimal? KritikUst, string Not,
-    TahlilDegeri Son, IReadOnlyList<TahlilDegeri> Trend);
+    decimal AltSinir, decimal UstSinir, decimal? KritikAlt, decimal? KritikUst, int Ondalik, string Not,
+    TahlilDegeri Son, IReadOnlyList<TahlilDegeri> Trend, SonucAciklamasi Aciklama);
 
 public sealed record TahlilDegeri(Guid Id, decimal Deger, DateTime Zaman, Isaret Isaret, bool HastayaYayinlandi);

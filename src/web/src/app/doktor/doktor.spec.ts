@@ -7,6 +7,13 @@ import { sahteBaglanti } from '../cekirdek/hub.sahte';
 import { Oturum } from '../cekirdek/oturum';
 import { Doktor } from './doktor';
 
+// jsdom'da ResizeObserver yok; PrimeNG Tabs sekme çubuğunu ölçmek için kullanır.
+globalThis.ResizeObserver ??= class {
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+} as unknown as typeof ResizeObserver;
+
 const satir = (durum: RandevuSatiri['durum'], izinliEylemler: RandevuSatiri['izinliEylemler']): RandevuSatiri => ({
   id: 'r1',
   baslangic: '2026-10-29T11:10:00Z',
@@ -152,5 +159,23 @@ describe('Doktor', () => {
     expect(sonra.classList).toContain('border-solid');
     expect(el.querySelector('[data-test="ai-onay"]')!.textContent).toContain('Uzm. Dr. Selin Arslan onayladı');
     expect(buton(el, 'Onayla')).toBeUndefined();
+  });
+
+  it('tahliller alınamazsa Uyarılar sütunu "Uyarı yok" demez', async () => {
+    const { fixture, http, el } = await kur();
+    listeyiVer(http, [satir('KabulEdildi', ['Cagir'])]);
+    await fixture.whenStable();
+
+    el.querySelector<HTMLButtonElement>('nav li button')!.click();
+    TestBed.tick();
+    http
+      .match('/api/hastalar/h1/tahliller')
+      .filter((i) => !i.cancelled)
+      .forEach((i) => i.flush('hata', { status: 500, statusText: 'Server Error' }));
+    await bekle();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[data-test="uyarilar-hata"]')!.textContent).toContain('uyarılar gösterilemiyor');
+    expect(el.textContent).not.toContain('Uyarı yok.');
   });
 });

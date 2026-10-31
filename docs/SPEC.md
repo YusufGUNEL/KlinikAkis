@@ -75,7 +75,7 @@ Sentetik hasta **"Ayşe K., 54, K"** (Tip 2 DM takibinde, penisilin alerjisi) il
 | LLM | Varsayılan: **Google Gemini API ücretsiz katmanı** (`gemini-3.5-flash-lite`, Google AI Studio anahtarı), OpenAI uyumlu uç üzerinden. **Ücretli sağlayıcı yok.** Yerel: Ollama + Qwen3 8B (Ollama'da Türkçe bir model varsa o da denenir) | Model adı ve JSON şema desteği **yazmadan önce** context7 / resmi dokümandan (ai.google.dev) doğrulanır |
 | Sentetik veri | **Bogus** (`tr` yereli, sabit seed) + elle yazılmış 6 senaryo | |
 | Frontend | **Angular** (`ng new` hangi kararlı sürümü verirse), standalone + signals + reactive forms, rol başına lazy route | Deneysel API (Signal Forms) kullanılmaz |
-| UI | **PrimeNG** (Aura teması, ana renk teal) + **Tailwind** (PrimeNG'nin resmi Tailwind entegrasyonu, kurulum anında dokümandan doğrulanır) | Grafik: PrimeNG Chart (Chart.js) |
+| UI | **PrimeNG** (Aura teması, ana renk teal) + **Tailwind** (PrimeNG'nin resmi Tailwind entegrasyonu, kurulum anında dokümandan doğrulanır) | Grafik: elle SVG sparkline + aralık çubuğu (paket yok; Aşama 6'da kullanıcı onayıyla Chart.js yerine) |
 | Test | **xUnit** (backend, `WebApplicationFactory`), Angular varsayılan test koşucusu | §11 |
 | API dokümanı | Yerleşik OpenAPI + **Scalar** | |
 | CI | GitHub Actions: backend build + test, Angular build | |
@@ -149,8 +149,8 @@ gösterilir. `DateTimeOffset` kullanılmaz (SQLite sağlayıcısı sıralayamaz)
 | **Kabul** | Id, RandevuId, KabulZamani, TakipNo (`SIM-000123`, simülasyon, ASCII), KabulEden |
 | **OnAnamnez** | Id, HastaId, RandevuId? (randevu oluşunca bağlanır), SohbetJson (adım, soru, cevap), AiTaslakJson, Kaynak (`Llm` \| `Yedek` \| `Kural`), HastaOnayi (bool + hasta notu), HekimDuzeltmesi (metin?), Durum (`Sohbette`, `KirmiziBayrak`, `Taslak`, `Onaylandi`, `Duzenlendi`, `Reddedildi`), OnaylayanHekimId, OnayZamani, KirmiziBayrakKurali?, AiModel?, AiZamani?, KotaDoldu (bool). AiTaslakJson §9.5 şemasıdır; `Siddet` (`Hafif`/`Orta`/`Siddetli`) ve `Aciliyet` (`Rutin`/`Oncelikli`) enum'ları oradan gelir ve değerlerini kod belirler |
 | **Muayene** | Id, RandevuId, BaslangicZamani, HekimNotu, Tanilar (ICD-10 kod listesi, artı aşamada), Durum (`Acik`, `Kapali`) |
-| **TahlilTanimi** | Id, Ad, HastaDostuAd ("Şeker ortalaması"), LoincKodu, Birim, AltSinir, UstSinir, CinsiyeteGore (K/E ayrı aralık), KritikAlt?, KritikUst?, Not ("örnek aralık, laboratuvara göre değişir") |
-| **TahlilSonucu** | Id, HastaId, TahlilTanimiId, Deger (decimal), Zaman, Isaret (kodla hesaplanır: `Normal`, `Yuksek`, `Dusuk`, `KritikYuksek`, `KritikDusuk`), AiAciklamaTaslak, YayinlananAciklama?, HastayaYayinlandi (bool + zaman + hekim) |
+| **TahlilTanimi** | Id, Ad, HastaDostuAd ("Şeker ortalaması"), LoincKodu, Birim, AltSinir, UstSinir, CinsiyeteGore (K/E ayrı aralık), KritikAlt?, KritikUst?, Not ("örnek aralık, laboratuvara göre değişir"), Ondalik (gösterim basamağı: "7,0", "128") |
+| **TahlilSonucu** | Id, HastaId, TahlilTanimiId, Deger (decimal), Zaman, Isaret (kodla hesaplanır: `Normal`, `Yuksek`, `Dusuk`, `KritikYuksek`, `KritikDusuk`), AiAciklamaTaslak, AciklamaKaynak? (`Llm`/`Yedek`), AiModel?, AiZamani?, KotaDoldu (kart başlığı, §10.2), YayinlananAciklama?, HastayaYayinlandi (bool + zaman + hekim) |
 | **Epikriz** (artı) | Id, MuayeneId, AiTaslak, SonMetin?, Kaynak, Durum (`Taslak`, `Onaylandi`, `Reddedildi`), OnaylayanHekimId |
 | **OutboxMesaji** (artı) | Id, PaketTipi (101 Hasta Kayıt, 103 Muayene, 105 Lab Sonuç), HastaTakmaAdi, PayloadJson, Durum (`Bekliyor`, `Gonderildi`, `IsKuraliHatasi`), Deneme, Zaman, Hata |
 | **AiAuditLog** | Id, Zaman, Ozellik (`OnAnamnez`, `TahlilAciklama`, `Epikriz`), HastaId? (panel süzgeci; modele gitmez), Saglayici (`Gemini`/`Ollama`/`Fake`/`Kural`), Model, IstemSurumu, MaskeliGirdi (metin), GirdiHash (SHA-256), CiktiJson, GecikmeMs, Basarili, YedegeDustu (bool), Neden? ("zaman aşımı", "geçersiz bölüm", "kota", kural adı) |
@@ -198,7 +198,7 @@ sabit Guid'ler). `POST /api/demo/reset` her şeyi bu duruma döndürür.
 |---|---|---|---|---|
 | 1 | **Ayşe K., 54, K** · Tip 2 DM · **penisilin alerjisi** · metformin | Çok su içme, sık idrar, halsizlik (birkaç haftadır) | HbA1c 6,6 (6 ay önce) → 7,0 (3 ay önce) → **7,4 (bu sabah)**; açlık glukozu 128; Hb 13,1 | Ana demo hastası. Öneri **Endokrinoloji**, alt. Dahiliye. HbA1c ▲ Y (amber), trend yükseliyor |
 | 2 | Mehmet T., 38, E · alerji yok | 3 gündür boğaz ağrısı + 38,4 °C ateş | — | Öneri KBB, alternatif Dahiliye |
-| 3 | Zeynep A., 29, K | Halsizlik, çabuk yorulma | Hb düşük, ferritin düşük | Öneri Dahiliye; tahlillerde ▼ D |
+| 3 | Zeynep A., 29, K | Halsizlik, çabuk yorulma | Hb **kritik düşük** (6,8; kritik alt 7,0), ferritin düşük | Öneri Dahiliye; Hb ‼ KD (§10.3 penceresi), ferritin ▼ D |
 | 4 | Hasan Y., 61, E | Göğüs ağrısı + terleme | — | **Kırmızı bayrak** → LLM çağrılmaz, "112'yi arayın" |
 | 5 | Elif S., 45, K | Kilo alma, üşüme | TSH yüksek | Endokrinoloji önerisi |
 | 6 | Can D., 7, E (veli adına) | Kulak ağrısı + ateş | — | Çocuk Sağlığı / alt. KBB |
@@ -211,6 +211,8 @@ sabit Guid'ler). `POST /api/demo/reset` her şeyi bu duruma döndürür.
   8 saat (gece görüşmesinde de boş slot olur). Bir kısmı dolu.
 - Tahliller gerçek LOINC kodlarıyla: HbA1c 4548-4, açlık glukozu 1558-6, hemoglobin 718-7,
   ferritin 2276-4, TSH 3016-3. Tahlil zamanları da şimdiye göre (Ayşe'nin son HbA1c'si bugün 08:15).
+- Bugünden önceki tahlil sonuçları önceki vizitlerde hastaya yayınlanmış gelir (açıklamasız): hasta trendi görür.
+  Bu sabahki sonuçlar yayınlanmamıştır; hekim açıklamayla birlikte yayınlar.
 - TC'ler sağlama hanesi geçerli (§9.2 algoritması), `99` ile başlar; her ekranda `SENTETİK` rozeti.
 
 ---
@@ -241,7 +243,7 @@ Tümü `/api` altında, JSON. Hata formatı ProblemDetails. Rol kontrolü JWT cl
 | PUT | `/muayeneler/{id}/not` | doktor | Hekim notu kaydet |
 | GET | `/hastalar/{id}/tahliller` | doktor | Sonuçlar + işaret + trend serisi |
 | POST | `/tahliller/{id}/aciklama` | doktor | AI açıklama taslağı üret |
-| POST | `/tahliller/yayinla` | doktor | `[{sonucId, aciklama}]` + kritik değer varsa `bilgilendirme` (§10.3) |
+| POST | `/tahliller/yayinla` | doktor | `{sonuclar: [{sonucId, aciklama}], bilgilendirme?}` (`TelefonlaBilgilendirildi` \| `Bilgilendirilecek`; kritik değer varsa zorunlu, §10.3); tek hasta; erişim kaydı + 105 outbox + `TahlilYayinlandi` |
 | GET | `/hasta/me/sonuclar` | hasta | **Yalnızca yayınlanmış** sonuçlar |
 | GET | `/ai/denetim?hastaId=` | doktor | "Modele giden veri" paneli |
 | GET | `/hastalar/{id}/erisim` | doktor | Erişim kaydı listesi |
@@ -574,7 +576,8 @@ Butonlar yalnızca durum makinesine uygun olduğunda etkin. Tablolar 32-36 px sa
   `lang="tr"` ile doğru çalışır.
 - **Sunucu `InvariantCulture`** ile çalışır; biçimlendirme istemcinin işidir. Kod/anahtar
   karşılaştırmaları `Ordinal`/`OrdinalIgnoreCase`. Türkçe metin eşleşmesi yalnızca `TurkceMetin`
-  içinde, açıkça `tr-TR` kültürüyle. (Gerekçe: Türk "i" sorunu varsayılan kültürü tr-TR yapınca kod
+  içinde, açıkça `tr-TR` kültürüyle. Tek istisna: modele giden ve yedek şablonun ürettiği tahlil cümlesi
+  sunucuda yazıldığı için sayıyı `TurkceMetin.Sayi` biçimlendirir ("7,4"). (Gerekçe: Türk "i" sorunu varsayılan kültürü tr-TR yapınca kod
   karşılaştırmalarını bozar.)
 - API decimal'leri JSON sayısı (nokta) döner; UTC zamanlar `Z` ekli ISO 8601.
 - Sunucu "bugün"ü `TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul")` ile hesaplar.

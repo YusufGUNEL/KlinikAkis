@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
 import { HastaKabugu } from './hasta-kabugu';
 
-// Hasta tarafı (telefon): randevularım, şikayet sohbeti → randevu. Sonuç ekranı Aşama 6'da eklenir.
+// Hasta tarafı (telefon): randevularım, şikayet sohbeti → randevu, sonuçlarım.
 export const hastaRotalari: Routes = [
   {
     path: '',
@@ -12,6 +12,11 @@ export const hastaRotalari: Routes = [
         path: 'sikayet',
         loadComponent: () => import('./sikayet').then((m) => m.Sikayet),
         title: 'Şikayetiniz · KlinikAkış',
+      },
+      {
+        path: 'sonuclar',
+        loadComponent: () => import('./sonuclar').then((m) => m.Sonuclar),
+        title: 'Sonuçlarım · KlinikAkış',
       },
       {
         path: 'randevu-al',

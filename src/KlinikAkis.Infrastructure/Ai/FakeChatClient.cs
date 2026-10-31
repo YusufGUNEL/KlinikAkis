@@ -38,7 +38,10 @@ public sealed class FakeChatClient : IChatClient
             await Task.Delay(Gecikme, cancellationToken);
 
         var kullaniciMetni = string.Join("\n", messages.Where(m => m.Role == ChatRole.User).Select(m => m.Text));
-        var json = Yanitla?.Invoke(kullaniciMetni) ?? HazirYanit(kullaniciMetni);
+        var json = Yanitla?.Invoke(kullaniciMetni)
+            ?? (options?.ResponseFormat is ChatResponseFormatJson { SchemaName: TahlilAciklamaYaniti.SemaAdi }
+                ? TahlilYaniti(kullaniciMetni)
+                : HazirYanit(kullaniciMetni));
         return new ChatResponse(new ChatMessage(ChatRole.Assistant, json)) { ModelId = ModelAdi };
     }
 
@@ -58,6 +61,22 @@ public sealed class FakeChatClient : IChatClient
         : null;
 
     public void Dispose() { }
+
+    /// <summary>Tahlil açıklaması (§9.6): istemdeki "tahlil:" ve kodla hesaplanmış "işaret" satırından sade cümle.</summary>
+    private static string TahlilYaniti(string metin)
+    {
+        string Satir(string anahtar) => metin.Split('\n')
+            .FirstOrDefault(s => s.StartsWith(anahtar, StringComparison.Ordinal))?[anahtar.Length..].Trim() ?? "";
+        var test = Satir("tahlil:");
+        var isaret = Satir("işaret (kodla hesaplandı):");
+        var degerler = Satir("son değerler (eskiden yeniye):").Split(" → ", StringSplitOptions.RemoveEmptyEntries);
+        var aciklama = $"{test} sonucunuz {isaret}. "
+            + (degerler.Length >= 2 ? $"Son ölçümleriniz sırasıyla {string.Join(" → ", degerler)}. " : "")
+            + (isaret.Contains("kritik", StringComparison.Ordinal)
+                ? "Doktorunuz sizinle iletişime geçecek."
+                : "Bu sonucu bir sonraki görüşmede doktorunuzla konuşun.");
+        return JsonSerializer.Serialize(new { aciklama }, Json);
+    }
 
     private static string HazirYanit(string metin)
     {

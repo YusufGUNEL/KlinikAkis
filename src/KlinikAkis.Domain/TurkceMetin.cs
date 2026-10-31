@@ -79,5 +79,8 @@ public static class TurkceMetin
     public static bool SozcukVar(string katlanmis, string sozcuk) =>
         katlanmis.Split(' ').Contains(sozcuk, StringComparer.Ordinal);
 
+    /// <summary>Hastaya giden cümlede ve istemde sayı: ondalık virgül, sabit basamak ("7,0", "128").</summary>
+    public static string Sayi(decimal deger, int ondalik) => deger.ToString("F" + ondalik, Tr);
+
     public static bool KesmeMi(char c) => c is '\'' or '’' or '‘' or '`' or '´';
 }

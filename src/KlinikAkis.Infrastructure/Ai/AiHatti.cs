@@ -16,6 +16,9 @@ namespace KlinikAkis.Infrastructure.Ai;
 public sealed record AiSonucu(
     AiKaynak Kaynak, OnAnamnezTaslagi? Taslak, KirmiziBayrak? KirmiziBayrak, string? Model = null, bool KotaDoldu = false);
 
+/// <summary>Tahlil açıklaması taslağı (SPEC §9.6): LLM ya da kural tabanlı yedek; model adı yalnızca LLM'de.</summary>
+public sealed record TahlilAiSonucu(AiKaynak Kaynak, string Aciklama, string? Model = null, bool KotaDoldu = false);
+
 /// <summary>
 /// Her LLM çağrısının geçtiği tek yol (SPEC §9.1): maskeleme → kural kontrolü → kota → IChatClient (JSON şema,
 /// zaman aşımı) → sunucu doğrulaması → (hata/geçersiz/zaman aşımı) kural tabanlı yedek → denetim kaydı.
@@ -26,10 +29,20 @@ public sealed class AiHatti(
     IChatClient istemci, GunlukKota kota, KlinikDbContext db, TimeProvider zaman, AiAyarlari ayar)
 {
     public const string OnAnamnezIstemSurumu = "onanamnez.v1";
+    public const string TahlilIstemSurumu = "tahlil.v1";
     public const string KotaNedeni = "kota";
     private const int OnAnamnezMaxToken = 1500;
+    private const int TahlilMaxToken = 400;
 
     private static readonly string OnAnamnezIstemSablonu = IstemOku(OnAnamnezIstemSurumu);
+    private static readonly string TahlilIstemi = IstemOku(TahlilIstemSurumu);
+
+    /// <summary>Bir model çağrısının denetim kaydına giden ortak bilgisi.</summary>
+    private sealed record Cagri(
+        AiOzellik Ozellik, string IstemSurumu, Guid HastaId, string Maskeli, string Saglayici, string Model, Stopwatch Olcum);
+
+    /// <summary>Model çağrısının sonucu: yanıt ya da (yedeğe düşme) nedeni.</summary>
+    private sealed record CagriSonucu(ChatResponse? Yanit, string? Neden, bool KotaDoldu);
 
     /// <summary>Sohbet adımı sırasında: yalnızca kural kontrolü (LLM yok). Tetiklenirse denetim kaydı ekler.</summary>
     public KirmiziBayrak? KuralKontrolu(Hasta hasta, IReadOnlyList<SohbetKaydi> sohbet)
@@ -63,60 +76,103 @@ public sealed class AiHatti(
             ResponseFormat = OnAnamnezTaslagi.YanitBicimi,
         };
 
-        var saglayici = istemci.GetService<FakeChatClient>() is not null ? FakeChatClient.Saglayici : ayar.Saglayici;
-        var model = istemci.GetService<ChatClientMetadata>()?.DefaultModelId ?? ayar.Model;
-        var olcum = Stopwatch.StartNew();
+        var cagri = YeniCagri(AiOzellik.OnAnamnez, OnAnamnezIstemSurumu, hasta.Id, maskeli);
+        var sonuc = await CagirAsync(cagri, mesajlar, secenekler, ct);
+        if (sonuc.Yanit is not { } yanit)
+            return Yedek(cagri, hasta, sohbet, hekimli, null, sonuc.Neden!, sonuc.KotaDoldu);
 
-        // Kota dolunca model çağrılmaz; taslak hastanın kendi cevaplarından (kural tabanlı) üretilir (SPEC §9.9).
-        // Hazır örnek metin kullanılmaz: başka bir hastanın öyküsü yanlışlıkla onaylanıp kayda geçmesin.
-        // Kota yalnızca gerçek sağlayıcı çağrılarını sayar; Fake modda rozet çıkmaz.
-        if (ayar.Saglayici != FakeChatClient.Saglayici && !kota.Ayir())
-            return Yedek(hasta, sohbet, hekimli, saglayici, model, maskeli, null, olcum, KotaNedeni, kotaDoldu: true);
-
-        using var sure = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        sure.CancelAfter(ayar.ZamanAsimi);
-        ChatResponse yanit;
-        try
-        {
-            yanit = await istemci.GetResponseAsync(mesajlar, secenekler, sure.Token);
-        }
-        catch (Exception e) when (SaglayiciKotasi(e))
-        {
-            // Ücretsiz katman doldu (429): günün kalanında sağlayıcı çağrılmaz.
-            kota.SaglayiciDoldu();
-            return Yedek(hasta, sohbet, hekimli, saglayici, model, maskeli, null, olcum,
-                Birlestir(KotaNedeni, "sağlayıcı 429"), kotaDoldu: true);
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            // Hasta sayfadan ayrıldı: maskeli metin sağlayıcıya gitmiş olabilir, iz kalsın (istek iptal olsa da).
-            DenetimEkle(hasta, saglayici, model, maskeli, null, olcum, basarili: false, yedek: false, "istemci iptal etti");
-            await db.SaveChangesAsync(CancellationToken.None);
-            throw;
-        }
-        catch (Exception e)
-        {
-            var hata = e is OperationCanceledException ? "zaman aşımı" : "sağlayıcı hatası";
-            return Yedek(hasta, sohbet, hekimli, saglayici, model, maskeli, null, olcum, hata, kotaDoldu: false);
-        }
-
-        var modelAdi = yanit.ModelId ?? model;
+        cagri = cagri with { Model = yanit.ModelId ?? cagri.Model };
         var dogrulama = OnAnamnezDogrulayici.Dogrula(yanit.Text, sohbet.Count, hekimli);
         if (dogrulama.Taslak is { } aday)
             dogrulama = OnAnamnezDogrulayici.KodKurallari(aday, sohbet,
                 IstanbulSaati.Yas(hasta.DogumTarihi, zaman.GetUtcNow().UtcDateTime), hekimli);
         if (dogrulama.Taslak is null)
-            return Yedek(hasta, sohbet, hekimli, saglayici, modelAdi, maskeli, yanit.Text, olcum, dogrulama.Neden!, kotaDoldu: false);
+            return Yedek(cagri, hasta, sohbet, hekimli, yanit.Text, dogrulama.Neden!, kotaDoldu: false);
 
-        DenetimEkle(hasta, saglayici, modelAdi, maskeli, dogrulama.Taslak.JsonOlarak(), olcum, basarili: true, yedek: false, null);
-        return new AiSonucu(AiKaynak.Llm, dogrulama.Taslak, null, modelAdi);
+        DenetimEkle(cagri, dogrulama.Taslak.JsonOlarak(), basarili: true, yedek: false, null);
+        return new AiSonucu(AiKaynak.Llm, dogrulama.Taslak, null, cagri.Model);
+    }
+
+    /// <summary>
+    /// Tahlil açıklaması (SPEC §9.6): işaret koddan gelir, model yalnızca cümle kurar. Modele kimlik gitmez; yanıt
+    /// 600 karakteri aşar ya da işaretle çelişirse işarete göre şablon cümleye (kural tabanlı yedek) düşülür.
+    /// </summary>
+    public async Task<TahlilAiSonucu> TahlilAciklamasiAsync(Guid hastaId, TahlilGirdisi girdi, CancellationToken ct)
+    {
+        var maskeli = girdi.MaskeliMetin();
+        List<ChatMessage> mesajlar = [new(ChatRole.System, TahlilIstemi), new(ChatRole.User, maskeli)];
+        var secenekler = new ChatOptions
+        {
+            MaxOutputTokens = TahlilMaxToken,
+            Temperature = 0.2f,
+            ResponseFormat = TahlilAciklamaYaniti.YanitBicimi,
+        };
+
+        var cagri = YeniCagri(AiOzellik.TahlilAciklama, TahlilIstemSurumu, hastaId, maskeli);
+        var sonuc = await CagirAsync(cagri, mesajlar, secenekler, ct);
+        string? cikti = null;
+        var neden = sonuc.Neden;
+        if (sonuc.Yanit is { } yanit)
+        {
+            cagri = cagri with { Model = yanit.ModelId ?? cagri.Model };
+            cikti = yanit.Text;
+            (var aciklama, neden) = TahlilAciklamaDogrulayici.Dogrula(cikti, girdi);
+            if (aciklama is not null)
+            {
+                DenetimEkle(cagri, new TahlilAciklamaYaniti(aciklama).JsonOlarak(), basarili: true, yedek: false, null);
+                return new TahlilAiSonucu(AiKaynak.Llm, aciklama, cagri.Model);
+            }
+        }
+
+        DenetimEkle(cagri, cikti, basarili: false, yedek: true, neden);
+        return new TahlilAiSonucu(AiKaynak.Yedek, TahlilYedekSablonu.Olustur(girdi), null, sonuc.KotaDoldu);
+    }
+
+    private Cagri YeniCagri(AiOzellik ozellik, string istemSurumu, Guid hastaId, string maskeli) =>
+        new(ozellik, istemSurumu, hastaId, maskeli,
+            istemci.GetService<FakeChatClient>() is not null ? FakeChatClient.Saglayici : ayar.Saglayici,
+            istemci.GetService<ChatClientMetadata>()?.DefaultModelId ?? ayar.Model,
+            Stopwatch.StartNew());
+
+    /// <summary>
+    /// Kota → model (zaman aşımıyla). Kota dolunca model çağrılmaz (SPEC §9.9); hazır örnek metin kullanılmaz, taslak
+    /// kural tabanlı üretilir. Kota yalnızca gerçek sağlayıcıyı sayar; Fake modda rozet çıkmaz.
+    /// </summary>
+    private async Task<CagriSonucu> CagirAsync(Cagri cagri, List<ChatMessage> mesajlar, ChatOptions secenekler, CancellationToken ct)
+    {
+        if (ayar.Saglayici != FakeChatClient.Saglayici && !kota.Ayir())
+            return new(null, KotaNedeni, true);
+
+        using var sure = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        sure.CancelAfter(ayar.ZamanAsimi);
+        try
+        {
+            return new(await istemci.GetResponseAsync(mesajlar, secenekler, sure.Token), null, false);
+        }
+        catch (Exception e) when (SaglayiciKotasi(e))
+        {
+            // Ücretsiz katman doldu (429): günün kalanında sağlayıcı çağrılmaz.
+            kota.SaglayiciDoldu();
+            return new(null, Birlestir(KotaNedeni, "sağlayıcı 429"), true);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Kullanıcı sayfadan ayrıldı: maskeli metin sağlayıcıya gitmiş olabilir, iz kalsın (istek iptal olsa da).
+            DenetimEkle(cagri, null, basarili: false, yedek: false, "istemci iptal etti");
+            await db.SaveChangesAsync(CancellationToken.None);
+            throw;
+        }
+        catch (Exception e)
+        {
+            return new(null, e is OperationCanceledException ? "zaman aşımı" : "sağlayıcı hatası", false);
+        }
     }
 
     /// <summary>Yedek dalı: modelin ham çıktısı (varsa) denetime yazılır, taslak kural tabanlı üretilir.</summary>
-    private AiSonucu Yedek(Hasta hasta, IReadOnlyList<SohbetKaydi> sohbet, IReadOnlySet<BransKodu> hekimli, string saglayici,
-        string model, string maskeli, string? cikti, Stopwatch olcum, string neden, bool kotaDoldu)
+    private AiSonucu Yedek(Cagri cagri, Hasta hasta, IReadOnlyList<SohbetKaydi> sohbet, IReadOnlySet<BransKodu> hekimli,
+        string? cikti, string neden, bool kotaDoldu)
     {
-        DenetimEkle(hasta, saglayici, model, maskeli, cikti, olcum, basarili: false, yedek: true, neden);
+        DenetimEkle(cagri, cikti, basarili: false, yedek: true, neden);
         var yas = IstanbulSaati.Yas(hasta.DogumTarihi, zaman.GetUtcNow().UtcDateTime);
         return new AiSonucu(AiKaynak.Yedek, KuralTabanliYedek.Olustur(sohbet, yas, hekimli), null, null, kotaDoldu);
     }
@@ -184,27 +240,26 @@ public sealed class AiHatti(
     }
 
     private void KuralDenetimi(Hasta hasta, string maskeli, KirmiziBayrak bayrak) =>
-        DenetimEkle(hasta, "Kural", "", maskeli,
-            $$"""{"kirmiziBayrak":"{{bayrak.Kural}}","llmCagrildi":false}""", Stopwatch.StartNew(),
+        DenetimEkle(new Cagri(AiOzellik.OnAnamnez, OnAnamnezIstemSurumu, hasta.Id, maskeli, "Kural", "", Stopwatch.StartNew()),
+            $$"""{"kirmiziBayrak":"{{bayrak.Kural}}","llmCagrildi":false}""",
             basarili: true, yedek: false, neden: bayrak.Kural.ToString());
 
-    private void DenetimEkle(Hasta hasta, string saglayici, string model, string maskeli, string? cikti,
-        Stopwatch olcum, bool basarili, bool yedek, string? neden)
+    private void DenetimEkle(Cagri cagri, string? cikti, bool basarili, bool yedek, string? neden)
     {
         db.AiAuditLoglari.Add(new AiAuditLog
         {
             Id = Guid.NewGuid(),
             Zaman = zaman.GetUtcNow().UtcDateTime,
-            Ozellik = AiOzellik.OnAnamnez,
-            HastaId = hasta.Id,
-            Saglayici = saglayici,
-            Model = model,
-            IstemSurumu = OnAnamnezIstemSurumu,
-            MaskeliGirdi = maskeli,
+            Ozellik = cagri.Ozellik,
+            HastaId = cagri.HastaId,
+            Saglayici = cagri.Saglayici,
+            Model = cagri.Model,
+            IstemSurumu = cagri.IstemSurumu,
+            MaskeliGirdi = cagri.Maskeli,
             // Hash maskeli metinden: ham kişisel veriden alınan hash sözlük saldırısıyla geri bulunabilir.
-            GirdiHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(maskeli))),
+            GirdiHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(cagri.Maskeli))),
             CiktiJson = cikti,
-            GecikmeMs = (int)olcum.ElapsedMilliseconds,
+            GecikmeMs = (int)cagri.Olcum.ElapsedMilliseconds,
             Basarili = basarili,
             YedegeDustu = yedek,
             Neden = neden,

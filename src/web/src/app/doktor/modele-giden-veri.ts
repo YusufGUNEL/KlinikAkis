@@ -42,7 +42,9 @@ export function saglayiciEtiketi(saglayici: string): string {
         <h3 class="text-xs font-semibold tracking-wide text-slate-600 uppercase">Gönderilen istem (maskeli)</h3>
         <pre class="mt-1 rounded-md border border-slate-200 bg-slate-50 p-3 font-mono text-[13px] whitespace-pre-wrap text-slate-900 [overflow-wrap:anywhere]">{{ d.maskeliGirdi }}</pre>
         <p class="mt-2">
-          @if (d.saglayici === 'Kural') {
+          @if (d.ozellik === 'TahlilAciklama') {
+            <span class="text-basari" aria-hidden="true">✓ </span>Kimlik gönderilmedi · işaret kodla hesaplandı, model yalnızca cümle kurdu
+          } @else if (d.saglayici === 'Kural') {
             <span class="font-medium text-tehlike"><span aria-hidden="true">‼ </span>Kırmızı bayrak kuralı: {{ kuralEtiketi[d.neden ?? ''] ?? d.neden }} · model çağrılmadı</span>
           } @else {
             <span class="text-basari" aria-hidden="true">✓ </span>Kırmızı bayrak kuralı: tetiklenmedi

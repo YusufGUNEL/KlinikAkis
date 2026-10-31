@@ -175,7 +175,8 @@ api.MapDemoEndpointleri()
     .MapBransSlotEndpointleri()
     .MapHastaEndpointleri()
     .MapRandevuEndpointleri()
-    .MapOnAnamnezEndpointleri();
+    .MapOnAnamnezEndpointleri()
+    .MapTahlilEndpointleri();
 
 app.MapHub<KlinikHub>(KlinikHub.Yol).RequireAuthorization();
 
