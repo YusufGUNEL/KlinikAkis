@@ -60,7 +60,7 @@ public static class MuayeneEndpointleri
         var (muayene, _, sorun) = await YukleAsync(id, kullanici, db, ct);
         if (sorun is not null) return sorun;
         if (muayene!.Durum == MuayeneDurumu.Kapali)
-            return TypedResults.Problem(detail: "Vizit kapandı; not değiştirilemez.", statusCode: StatusCodes.Status409Conflict);
+            return VizitKapali("Vizit kapandı; not değiştirilemez.");
 
         var metin = string.IsNullOrWhiteSpace(istek.Metin) ? null : istek.Metin.Trim();
         if (metin is { Length: > MetinSiniri })
@@ -75,6 +75,7 @@ public static class MuayeneEndpointleri
     {
         var (muayene, randevu, sorun) = await YukleAsync(id, kullanici, db, ct);
         if (sorun is not null) return sorun;
+        if (muayene!.Durum == MuayeneDurumu.Kapali) return VizitKapali();
 
         // Bekleyen ya da onaylanmış taslak varken model yeniden çağrılmaz (maliyet/kota); ret sonrası yenisi üretilir.
         var son = await SonEpikrizAsync(db, muayene!.Id, ct);
@@ -118,6 +119,8 @@ public static class MuayeneEndpointleri
             return TypedResults.Problem(detail: "Epikriz bulunamadı.", statusCode: StatusCodes.Status404NotFound);
         var (muayene, randevu, sorun) = await YukleAsync(epikriz.MuayeneId, kullanici, db, ct);
         if (sorun is not null) return sorun;
+        // 103 paketi kapanışta epikrizOnayli ile gider; sonradan verilen karar pakete yansımaz, o yüzden kapalı vizitte karar yok.
+        if (muayene!.Durum == MuayeneDurumu.Kapali) return VizitKapali();
         if (epikriz.Durum != EpikrizDurumu.Taslak)
             return TypedResults.Problem(detail: "Bu epikriz için karar zaten verildi.", statusCode: StatusCodes.Status409Conflict);
 
@@ -238,6 +241,9 @@ public static class MuayeneEndpointleri
             return (null, null, TypedResults.Problem(detail: "Bu işlem için yetkiniz yok.", statusCode: StatusCodes.Status403Forbidden));
         return (muayene, randevu, null);
     }
+
+    private static ProblemHttpResult VizitKapali(string detay = "Vizit kapandı; epikriz değiştirilemez.") =>
+        TypedResults.Problem(detail: detay, statusCode: StatusCodes.Status409Conflict);
 
     private static ProblemHttpResult Bulunamadi() =>
         TypedResults.Problem(detail: "Muayene bulunamadı.", statusCode: StatusCodes.Status404NotFound);

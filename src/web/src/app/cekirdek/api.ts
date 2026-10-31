@@ -112,6 +112,20 @@ export interface TvCagrisi {
   zaman: string;
 }
 
+export type OutboxPaketTipi = 'HastaKayit' | 'Muayene' | 'LabSonuc';
+export type OutboxDurumu = 'Bekliyor' | 'Gonderildi' | 'IsKuraliHatasi';
+
+/** e-Nabız gönderim kutusu satırı (taslak 9, simülasyon); hasta yalnızca takma adla. */
+export interface OutboxSatiri {
+  id: string;
+  paketTipi: OutboxPaketTipi;
+  hastaTakmaAdi: string;
+  durum: OutboxDurumu;
+  deneme: number;
+  zaman: string;
+  hata: string | null;
+}
+
 /** SignalR olayı: yalnızca {tur, id}; istemci ilgili REST'i yeniden çeker (SPEC §8). */
 export interface Olay {
   tur: string;

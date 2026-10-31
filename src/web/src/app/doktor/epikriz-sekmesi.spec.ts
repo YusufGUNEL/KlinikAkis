@@ -78,6 +78,13 @@ describe('EpikrizSekmesi', () => {
     expect(el.textContent).not.toContain('Reddet');
   });
 
+  it('kapalı vizitte taslak kalsa da karar ve oluştur butonu yok', () => {
+    const { el } = kur({ ...muayene(kart()), durum: 'Kapali' });
+    expect(el.textContent).not.toContain('Onayla');
+    expect(el.querySelector('[data-test="epikriz-uret"]')).toBeNull();
+    expect(el.querySelector('[data-test="epikriz-kapali"]')!.textContent).toContain('onaylanmadan kapatıldı');
+  });
+
   it('düzenlenmiş epikrizde alerji ve tahlil satırları yine koddan, kırmızı ve [kayıttan] ile görünür', () => {
     const { el } = kur(
       muayene(

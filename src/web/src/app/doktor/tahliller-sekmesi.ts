@@ -80,8 +80,15 @@ interface BekleyenYayin {
       <div class="mt-2 flex max-w-3xl flex-col gap-3">
         @for (s of satirlar(); track s.tahlilTanimiId) {
           @let a = s.aciklama;
-          @if (s.son.hastayaYayinlandi && a.yayinlanan) {
-            <app-ai-karti [kaynak]="a.kaynak ?? 'Kural'" [zaman]="a.zaman ?? a.yayinZamani!" [model]="a.model ?? ''" [onay]="onay(s)">
+          @if (s.son.hastayaYayinlandi && a.yayinlanan && !a.kaynak) {
+            <!-- AI taslağı olmadan hekimin yazıp yayınladığı metin: AI kartı ve "kural tabanlı" başlığı uydurulmaz. -->
+            <div class="rounded-lg border border-slate-200 bg-white p-3" data-test="hekim-aciklamasi">
+              <p class="font-medium">{{ s.hastaDostuAd }} ({{ s.ad }}) · {{ s.son.deger | number: basamak(s.ondalik) }} {{ s.birim }}</p>
+              <p class="mt-1 whitespace-pre-line" data-test="yayinlanan">{{ a.yayinlanan }}</p>
+              <p class="mt-2 text-xs text-slate-600">Hekim yazdı · {{ a.yayinlayanHekim }} · {{ a.yayinZamani | date: 'HH:mm' }}</p>
+            </div>
+          } @else if (s.son.hastayaYayinlandi && a.yayinlanan) {
+            <app-ai-karti [kaynak]="a.kaynak!" [zaman]="a.zaman ?? a.yayinZamani!" [model]="a.model ?? ''" [onay]="onay(s)">
               <p class="font-medium">{{ s.hastaDostuAd }} ({{ s.ad }}) · {{ s.son.deger | number: basamak(s.ondalik) }} {{ s.birim }}</p>
               <p class="mt-1 whitespace-pre-line" data-test="yayinlanan">{{ a.yayinlanan }}</p>
               @if (a.taslak && a.taslak !== a.yayinlanan) {

@@ -50,7 +50,7 @@ export function epikrizMetni(t: EpikrizTaslagi): string {
         <app-ai-karti [kaynak]="e.kaynak" [zaman]="e.zaman" [model]="e.model ?? ''" [kotaDoldu]="e.kotaDoldu" [onay]="onay()">
             <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2" [class.line-through]="e.durum === 'Reddedildi'" data-test="epikriz-bolumleri">
               @if (e.sonMetin) {
-                <dt class="text-slate-600">Hekim metni</dt>
+                <dt class="text-slate-600">Düzenlenmiş metin</dt>
                 <dd class="whitespace-pre-line" data-test="epikriz-son-metin">{{ e.sonMetin }}</dd>
               } @else {
                 <dt class="text-slate-600">Öykü</dt>
@@ -63,7 +63,7 @@ export function epikrizMetni(t: EpikrizTaslagi): string {
                 } @else {
                   <span class="font-semibold text-tehlike"><span aria-hidden="true">⛔ </span>{{ e.taslak.alerji }}</span>
                 }
-                <span class="text-xs text-slate-600">[kayıttan]</span>
+                <span class="ml-1 text-xs text-slate-600">[kayıttan]</span>
               </dd>
               <dt class="text-slate-600">Tahliller</dt>
               <dd>
@@ -103,7 +103,7 @@ export function epikrizMetni(t: EpikrizTaslagi): string {
                 <button pButton type="button" severity="secondary" variant="outlined" class="ikincil" (click)="vazgec()">Vazgeç</button>
               </div>
             </form>
-          } @else if (e.durum === 'Taslak') {
+          } @else if (e.durum === 'Taslak' && !kapali()) {
             <ng-container aiButonlar>
               <button pButton type="button" [disabled]="islemde()" (click)="karar('onayla')">Onayla</button>
               <button pButton type="button" severity="secondary" variant="outlined" class="ikincil" [disabled]="islemde()" (click)="duzenleBasla()">
@@ -125,7 +125,9 @@ export function epikrizMetni(t: EpikrizTaslagi): string {
         </app-ai-karti>
       }
 
-      @if (!detay().epikriz || detay().epikriz?.durum === 'Reddedildi') {
+      @if (kapali() && detay().epikriz?.durum !== 'Onaylandi') {
+        <p class="text-slate-700" data-test="epikriz-kapali">Vizit kapandı; epikriz onaylanmadan kapatıldı.</p>
+      } @else if (!detay().epikriz || detay().epikriz?.durum === 'Reddedildi') {
         <div class="flex flex-col items-start gap-2">
           <button pButton type="button" [disabled]="islemde()" (click)="uret()" data-test="epikriz-uret">
             {{ uretiliyor() ? 'Taslak hazırlanıyor…' : detay().epikriz ? 'Yeni epikriz taslağı oluştur' : 'Epikriz taslağı oluştur' }}

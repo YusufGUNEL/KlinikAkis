@@ -4,13 +4,14 @@ import { afterNextRender, Component, computed, ElementRef, inject, Injector, sig
 import { QRCodeComponent } from 'angularx-qrcode';
 import { ButtonModule } from 'primeng/button';
 import { TabsModule } from 'primeng/tabs';
-import { DenetimSatiri, ErisimSatiri, HastaOzeti, MuayeneDetayi, OnAnamnezDetayi, RandevuEylemi, RandevuSatiri } from '../cekirdek/api';
+import { DenetimSatiri, ErisimSatiri, HastaOzeti, MuayeneDetayi, OnAnamnezDetayi, OutboxSatiri, RandevuEylemi, RandevuSatiri } from '../cekirdek/api';
 import { HubService, hubIleYenile } from '../cekirdek/hub';
 import { EYLEM_ETIKETI, EYLEM_SONUCU, hataMesaji, RandevuIslemleri, saatEtiketi } from '../cekirdek/randevu';
 import { ISARET_ETIKETI, TahlilSatiri } from '../cekirdek/tahlil';
 import { BaglantiGostergesi } from '../ortak/baglanti-gostergesi';
 import { DurumKutusu } from '../ortak/durum-kutusu';
 import { DurumRozeti } from '../ortak/durum-rozeti';
+import { GonderimKutusu, PAKET_ADI } from '../ortak/gonderim-kutusu';
 import { HastaBandi } from '../ortak/hasta-bandi';
 import { simdiSinyali } from '../ortak/simdi';
 import { UstCubuk } from '../ortak/ust-cubuk';
@@ -40,6 +41,7 @@ const OZELLIK_ADI: Record<string, string> = { OnAnamnez: 'ön anamnez', TahlilAc
     DatePipe,
     DurumKutusu,
     DurumRozeti,
+    GonderimKutusu,
     EpikrizSekmesi,
     HastaBandi,
     ModeleGidenVeri,
@@ -192,8 +194,16 @@ const OZELLIK_ADI: Record<string, string> = { OnAnamnez: 'ön anamnez', TahlilAc
           <section class="border-b border-slate-100 pb-3" aria-labelledby="uyarilar-baslik">
             <h2 id="uyarilar-baslik" class="text-xs font-semibold tracking-wide text-slate-600 uppercase">Uyarılar</h2>
             <!-- Sessiz rozet (SPEC §10.3 kademe 3): referans dışı son sonuçlar; tıklanınca Tahliller sekmesi. -->
-            @if (uyarilar().length) {
+            @if (uyarilar().length || outboxHatasi() || outboxAlinamadi()) {
               <ul class="mt-1 flex flex-col gap-1" data-test="uyarilar">
+                @if (outboxAlinamadi()) {
+                  <!-- Gönderim kutusu alınamadıysa "uyarı yok" denmez: yanlış güvence olur (tahlillerdeki gibi). -->
+                  <li class="px-1 text-uyari" data-test="outbox-alinamadi"><span aria-hidden="true">⚠ </span>e-Nabız durumu alınamadı</li>
+                }
+                @if (outboxHatasi(); as h) {
+                  <!-- İdari uyarı (taslak 4): amber, kırmızı değil; ayrıntı aşağıdaki gönderim kutusunda. -->
+                  <li class="px-1 text-uyari" data-test="outbox-uyarisi"><span aria-hidden="true">● </span>{{ paketAdi[h.paketTipi] }}: iş kuralı hatası</li>
+                }
                 @for (u of uyarilar(); track u.tahlilTanimiId) {
                   <li>
                     <button type="button" class="rounded px-1 text-left hover:bg-slate-50" (click)="sekme.set('tahliller')">
@@ -245,6 +255,10 @@ const OZELLIK_ADI: Record<string, string> = { OnAnamnez: 'ön anamnez', TahlilAc
               <p class="mt-1 text-slate-700">{{ secili() ? 'Henüz model çağrısı yok.' : 'Hasta seçilmedi.' }}</p>
             }
           </section>
+          <div class="border-b border-slate-100 py-3">
+            <app-gonderim-kutusu [liste]="outbox" [kompakt]="true" baslikId="gonderim-yan-baslik"
+              [bosMesaj]="secili() ? 'Bu hastaya ait paket yok.' : 'Hasta seçilmedi.'" />
+          </div>
           <section class="py-3" aria-labelledby="erisim-baslik">
             <h2 id="erisim-baslik" class="text-xs font-semibold tracking-wide text-slate-600 uppercase">Erişim kaydı</h2>
             @if (erisim.hasValue() && erisim.value().length) {
@@ -340,11 +354,21 @@ export class Doktor {
     const id = this.seciliHastaId();
     return id && this.ozet.hasValue() ? `/api/hastalar/${id}/erisim` : undefined;
   });
+  // Gönderim kutusu (simülasyon): seçili hastanın paketleri, takma adla (kimlik pakete girmez).
+  protected readonly outbox = httpResource<OutboxSatiri[]>(() => {
+    const takmaAd = this.ozet.hasValue() ? this.ozet.value().takmaAd : undefined;
+    return takmaAd ? `/api/outbox?takmaAd=${encodeURIComponent(takmaAd)}` : undefined;
+  });
+  protected readonly paketAdi = PAKET_ADI;
+  protected readonly outboxHatasi = computed(
+    () => (this.outbox.hasValue() ? this.outbox.value()?.find((p) => p.durum === 'IsKuraliHatasi') : undefined),
+  );
+  protected readonly outboxAlinamadi = computed(() => !!this.secili() && !!this.outbox.error());
   private readonly injector = inject(Injector);
 
   constructor() {
     this.hub.baglan();
-    hubIleYenile(this.liste, this.detay, this.denetim, this.erisim, this.tahliller, this.muayene);
+    hubIleYenile(this.liste, this.detay, this.denetim, this.erisim, this.tahliller, this.muayene, this.outbox);
   }
 
   /** Panel ana alanın altında açılır: görünür alana kaydır, odağı başlığına ver. */

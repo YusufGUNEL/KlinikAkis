@@ -1,10 +1,10 @@
 using System.Security.Claims;
-using System.Text.Json;
 using KlinikAkis.Api.Gercekzaman;
 using KlinikAkis.Api.Kimlik;
 using KlinikAkis.Domain;
 using KlinikAkis.Domain.Varliklar;
 using KlinikAkis.Infrastructure.Ai;
+using KlinikAkis.Infrastructure.Outbox;
 using KlinikAkis.Infrastructure.Veri;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -109,20 +109,16 @@ public static class TahlilEndpointleri
             s.HastayaYayinlandi = true;
             s.YayinZamani = simdi;
             s.YayinlayanHekimId = hekimId;
-            // e-Nabız 105 Lab Sonuç (simülasyon, SPEC §5.2): kimlik yerine takma ad; gönderen işleyici Aşama 7'de.
-            db.OutboxMesajlari.Add(new OutboxMesaji
-            {
-                Id = Guid.NewGuid(),
-                PaketTipi = PaketTipi.LabSonuc,
-                HastaTakmaAdi = takmaAd,
-                PayloadJson = JsonSerializer.Serialize(new
-                {
-                    loinc = s.TahlilTanimi!.LoincKodu, deger = s.Deger, birim = s.TahlilTanimi.Birim,
-                    isaret = s.Isaret.ToString(), zaman = s.Zaman,
-                }, JsonSerializerOptions.Web),
-                Zaman = simdi,
-            });
         }
+        // e-Nabız 105 Lab Sonuç (simülasyon, SPEC §5.2): yayın başına tek paket, sonuçlar listede; kimlik yerine takma ad.
+        db.OutboxMesajlari.Add(OutboxGonderici.Paket(PaketTipi.LabSonuc, takmaAd, new
+        {
+            sonuclar = sonuclar.Select(s => new
+            {
+                loinc = s.TahlilTanimi!.LoincKodu, deger = s.Deger, birim = s.TahlilTanimi.Birim,
+                isaret = s.Isaret.ToString(), zaman = s.Zaman,
+            }),
+        }, simdi));
 
         var testler = string.Join(", ", sonuclar.Select(s => s.TahlilTanimi!.Ad));
         Erisim(sonuclar.Count == 1 ? $"Tahlil sonucunu hastaya yayınladı: {testler}" : $"Tahlil sonuçlarını hastaya yayınladı: {testler}");

@@ -1,14 +1,15 @@
 import { DatePipe } from '@angular/common';
 import { httpResource } from '@angular/common/http';
-import { Component, ElementRef, inject, signal } from '@angular/core';
+import { Component, computed, ElementRef, inject, signal } from '@angular/core';
 import { ButtonModule } from 'primeng/button';
-import { RandevuDurumu, RandevuEylemi, RandevuSatiri } from '../cekirdek/api';
+import { OutboxSatiri, RandevuDurumu, RandevuEylemi, RandevuSatiri } from '../cekirdek/api';
 import { Demo } from '../cekirdek/demo';
 import { HubService, hubIleYenile } from '../cekirdek/hub';
 import { EYLEM_ETIKETI, hataMesaji, RandevuIslemleri, saatEtiketi } from '../cekirdek/randevu';
 import { BaglantiGostergesi } from '../ortak/baglanti-gostergesi';
 import { DurumKutusu } from '../ortak/durum-kutusu';
 import { DurumRozeti } from '../ortak/durum-rozeti';
+import { GonderimKutusu } from '../ortak/gonderim-kutusu';
 import { simdiSinyali } from '../ortak/simdi';
 import { UstCubuk } from '../ortak/ust-cubuk';
 
@@ -26,7 +27,7 @@ const DURUM_ADI: Record<RandevuDurumu, string> = {
 /** Kabul ekranı (taslak 7): günün randevuları canlı, isimler sunucuda maskelenmiş gelir. */
 @Component({
   selector: 'app-kabul',
-  imports: [BaglantiGostergesi, ButtonModule, DatePipe, DurumKutusu, DurumRozeti, UstCubuk],
+  imports: [BaglantiGostergesi, ButtonModule, DatePipe, DurumKutusu, DurumRozeti, GonderimKutusu, UstCubuk],
   template: `
     <div class="flex min-h-dvh flex-col text-sm">
       <app-ust-cubuk ekran="Kabul"><app-baglanti-gostergesi [durum]="hub.durum()" /></app-ust-cubuk>
@@ -36,6 +37,12 @@ const DURUM_ADI: Record<RandevuDurumu, string> = {
             Kabul · Bugün <span class="tabular-nums">{{ bugun() | date }}</span>
           </h1>
           <span class="flex items-center gap-3">
+            @if (gonderimHatasi()) {
+              <!-- Tablo uzun; kutu en altta. İş kuralı hatası üstte duyurulur, tıklayınca kutuya gider (amber, kırmızı değil). -->
+              <button type="button" class="rounded px-1 font-medium text-uyari underline" data-test="gonderim-hatasi" (click)="kutuyaGit()">
+                <span aria-hidden="true">⚠</span> {{ gonderimHatasi() }} iş kuralı hatası
+              </button>
+            }
             @if (mesaj()) {
               <span class="text-slate-700" role="status">{{ mesaj() }}</span>
             }
@@ -66,7 +73,7 @@ const DURUM_ADI: Record<RandevuDurumu, string> = {
             } @else if (liste.hasValue()) {
               @for (r of liste.value(); track r.id) {
                 <tr class="border-b border-slate-100 align-top" tabindex="-1" [attr.data-id]="r.id">
-                  <td class="px-3 py-2 tabular-nums">{{ saat(r.baslangic) }} · {{ r.siraNo }}</td>
+                  <td class="px-3 py-2 whitespace-nowrap tabular-nums">{{ saat(r.baslangic) }} · {{ r.siraNo }}</td>
                   <td class="px-3 py-2">
                     <span class="font-medium text-slate-900">{{ r.hastaAd }}</span>
                     @if (r.takipNo) {
@@ -80,7 +87,7 @@ const DURUM_ADI: Record<RandevuDurumu, string> = {
                   <td class="px-3 py-2">{{ r.hekimAd }}</td>
                   <td class="px-3 py-2"><app-durum-rozeti [durum]="r.durum" /></td>
                   <td class="px-3 py-1">
-                    <span class="flex flex-wrap gap-1">
+                    <span class="flex gap-1 whitespace-nowrap">
                       @for (e of kabulEylemleri; track e) {
                         @if (r.izinliEylemler.includes(e)) {
                           <button
@@ -108,6 +115,8 @@ const DURUM_ADI: Record<RandevuDurumu, string> = {
             }
           </tbody>
         </table>
+
+        <app-gonderim-kutusu class="mt-8 block" [liste]="outbox" />
       </main>
     </div>
   `,
@@ -131,10 +140,20 @@ export class Kabul {
   private readonly kok = inject<ElementRef<HTMLElement>>(ElementRef);
 
   protected readonly liste = httpResource<RandevuSatiri[]>(() => '/api/randevular');
+  protected readonly outbox = httpResource<OutboxSatiri[]>(() => '/api/outbox');
+  protected readonly gonderimHatasi = computed(() =>
+    this.outbox.hasValue() ? (this.outbox.value() ?? []).filter((p) => p.durum === 'IsKuraliHatasi').length : 0,
+  );
 
   constructor() {
     this.hub.baglan();
-    hubIleYenile(this.liste);
+    hubIleYenile(this.liste, this.outbox);
+  }
+
+  protected kutuyaGit(): void {
+    const baslik = this.kok.nativeElement.querySelector<HTMLElement>('#gonderim-baslik');
+    baslik?.scrollIntoView({ block: 'start' });
+    baslik?.focus();
   }
 
   protected saat(iso: string): string {

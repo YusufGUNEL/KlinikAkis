@@ -139,7 +139,7 @@ public sealed class EpikrizTestleri(KlinikApiFabrikasi fabrika) : IClassFixture<
     }
 
     [Fact]
-    public async Task Hekim_notu_yalniz_randevunun_hekimi_yazar_kapanan_vizitte_409()
+    public async Task Hekim_notu_yalniz_randevunun_hekimi_yazar_kapanan_vizitte_not_taslak_karar_409()
     {
         var (doktor, muayeneId) = await MuayenedeAsync(SenaryoIdleri.Mehmet);
         var baskaHekim = await fabrika.GirisYapAsync("doktor", SenaryoIdleri.HekimKbb);
@@ -149,10 +149,16 @@ public sealed class EpikrizTestleri(KlinikApiFabrikasi fabrika) : IClassFixture<
         var detay = await Json(await doktor.PutAsJsonAsync($"/api/muayeneler/{muayeneId}/not", new { metin = "  Boğaz hiperemik.  " }));
         Assert.Equal("Boğaz hiperemik.", detay.GetProperty("hekimNotu").GetString());
 
+        var epikrizId = (await Json(await doktor.PostAsync($"/api/muayeneler/{muayeneId}/epikriz", null)))
+            .GetProperty("epikriz").GetProperty("id").GetGuid();
         var randevuId = detay.GetProperty("randevuId").GetGuid();
         (await doktor.PostAsync($"/api/randevular/{randevuId}/kapat", null)).EnsureSuccessStatusCode();
         Assert.Equal(HttpStatusCode.Conflict,
             (await doktor.PutAsJsonAsync($"/api/muayeneler/{muayeneId}/not", new { metin = "geç not" })).StatusCode);
+        // 103 kapanışta gitti: sonradan taslak ya da karar kayıtla paketi ayırır.
+        Assert.Equal(HttpStatusCode.Conflict, (await doktor.PostAsync($"/api/muayeneler/{muayeneId}/epikriz", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict,
+            (await doktor.PostAsJsonAsync($"/api/epikriz/{epikrizId}/karar", new { karar = "onayla" })).StatusCode);
     }
 
     [Fact]

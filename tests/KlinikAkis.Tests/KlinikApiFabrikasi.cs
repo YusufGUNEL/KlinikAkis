@@ -23,7 +23,12 @@ public sealed class KlinikApiFabrikasi : WebApplicationFactory<Program>
         builder.UseEnvironment("Development");
         builder.UseSetting("ConnectionStrings:Default", $"Data Source={DbYolu}");
         builder.UseSetting("Jwt:Key", "test-anahtari-yalnizca-testlerde-kullanilir-32+");
-        builder.ConfigureTestServices(s => s.Replace(ServiceDescriptor.Singleton<TimeProvider>(new SabitZaman(Simdi))));
+        builder.ConfigureTestServices(s =>
+        {
+            s.Replace(ServiceDescriptor.Singleton<TimeProvider>(new SabitZaman(Simdi)));
+            // Gönderim kutusu testleri OutboxGonderici'yi elle, verilen saatle çağırır; arka plan döngüsü SQLite'a dokunmasın.
+            foreach (var d in s.Where(d => d.ImplementationType == typeof(Api.Gercekzaman.OutboxIsleyici)).ToList()) s.Remove(d);
+        });
     }
 
     /// <summary>/api/demo/login ile token alır; token'ı Authorization başlığına koyan istemci döner.</summary>

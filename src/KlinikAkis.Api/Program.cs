@@ -112,6 +112,8 @@ builder.Services.AddAuthorizationBuilder().AddDemoPolitikalari();
 builder.Services.AddSignalR()
     .AddJsonProtocol(o => o.PayloadSerializerOptions.Encoder = JavaScriptEncoder.Create(UnicodeRanges.All));
 builder.Services.AddSingleton<IOlayYayinci, OlayYayinci>();
+// e-Nabız gönderim kutusu (simülasyon, SPEC §5.2): saniyede bir bekleyen paketleri işler.
+builder.Services.AddHostedService<OutboxIsleyici>();
 // Her LLM çağrısı tek AiHatti üzerinden (SPEC §9.1). AI:Provider yoksa Fake: demo ağsız ve ücretsiz çalışır.
 var aiAyar = builder.Services.AddKlinikAi(builder.Configuration);
 // LLM uçları herkese açık URL'de: IP başına dakikada 10 istek, aşımda 429 ProblemDetails (SPEC §9.9).
@@ -179,7 +181,8 @@ api.MapDemoEndpointleri()
     .MapOnAnamnezEndpointleri()
     .MapTahlilEndpointleri()
     .MapMuayeneEndpointleri()
-    .MapTvEndpointleri();
+    .MapTvEndpointleri()
+    .MapOutboxEndpointleri();
 
 app.MapHub<KlinikHub>(KlinikHub.Yol).RequireAuthorization();
 

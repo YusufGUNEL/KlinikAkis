@@ -117,10 +117,10 @@ KlinikAkis/
 │  ├─ SPEC.md                 ← bu dosya
 │  └─ architecture.md         ← Mermaid şema (Aşama 9)
 ├─ src/
-│  ├─ KlinikAkis.Api/         ← Minimal API endpoint'leri, hub, Program.cs, wwwroot (build çıktısı)
+│  ├─ KlinikAkis.Api/         ← Minimal API endpoint'leri, hub, outbox döngüsü (OutboxIsleyici), Program.cs, wwwroot
 │  ├─ KlinikAkis.Domain/      ← varlıklar, enum'lar, kurallar (durum makinesi, H/L, kırmızı bayrak,
 │  │                             TurkceMetin, TC sağlama, SUT)
-│  ├─ KlinikAkis.Infrastructure/ ← DbContext, seed, AI istemcileri, istemler, maskeleme, outbox worker
+│  ├─ KlinikAkis.Infrastructure/ ← DbContext, seed, AI istemcileri, istemler, maskeleme, outbox gönderici
 │  └─ web/                    ← Angular uygulaması (proxy.conf.json ile /api ve /hubs → backend)
 ├─ tests/
 │  └─ KlinikAkis.Tests/       ← xUnit (birim + WebApplicationFactory entegrasyon)
@@ -171,10 +171,15 @@ Planlandi ──kabul──► KabulEdildi ──cagir──► Cagrildi ──b
 - `basla` bir `Muayene` kaydı açar; `kapat` muayeneyi kapatır ve 103 paketini kuyruğa ekler.
 
 ### 5.2 Outbox paket tetikleyicileri (simülasyon)
-- `kabul` → 101 Hasta Kayıt · `kapat` → 103 Muayene · `yayinla` → 105 Lab Sonuç.
-- `OutboxIsleyici` (`BackgroundService`) 2 sn sonra "gönderir" → `Gonderildi`.
+- `kabul` → 101 Hasta Kayıt · `kapat` → 103 Muayene (epikriz onaylı mı bilgisiyle; epikriz metni gitmez) ·
+  `yayinla` → 105 Lab Sonuç (**yayın başına tek paket**, sonuçlar listede). Paketlerde kimlik yok, yalnızca takma ad.
+- `OutboxIsleyici` (`BackgroundService`, saniyede bir) 2 sn sonra "gönderir" → `Gonderildi`; değişiklikte
+  `OutboxGuncellendi` (demo grubu). Gönderim mantığı Infrastructure'da `OutboxGonderici.IsleAsync(simdi)`.
+  Boşta veritabanı yoklanmaz (Neon uykuya geçebilsin): yalnızca bekleyen paket varken ya da yeni/yeniden denenen
+  paketten sonraki 10 sn içinde.
 - Demo için **her sıfırlamadan sonraki ilk 105 paketi** deterministik olarak `IsKuraliHatasi`
-  ("Sonuç birimi UCUM biçiminde değil — simülasyon") verir; "Yeniden dene" başarılı olur.
+  ("Sonuç birimi UCUM biçiminde değil — simülasyon") verir; "Yeniden dene" başarılı olur. Kural durumsuzdur:
+  daha önce işlenmiş (Deneme > 0) 105 yoksa bu ilk 105'tir (sıfırlama tabloyu boşalttığı için deterministik).
 
 ### 5.3 Şema ve sıfırlama
 - Başlangıçta `EnsureCreated()`; veritabanı boşsa seed çalışır.
@@ -249,10 +254,10 @@ Tümü `/api` altında, JSON. Hata formatı ProblemDetails. Rol kontrolü JWT cl
 | GET | `/hasta/me/sonuclar` | hasta | **Yalnızca yayınlanmış** sonuçlar |
 | GET | `/ai/denetim?hastaId=` | doktor | "Modele giden veri" paneli |
 | GET | `/hastalar/{id}/erisim` | doktor | Erişim kaydı listesi |
-| POST | `/muayeneler/{id}/epikriz` | doktor | (artı) Epikriz taslağı (bekleyen taslak varsa model yeniden çağrılmaz, o döner) |
-| POST | `/epikriz/{id}/karar` | doktor | (artı) `onayla` / `duzenle` / `reddet` |
-| GET | `/outbox` | doktor, kabul | (artı) Gönderim kutusu |
-| POST | `/outbox/{id}/yeniden-dene` | doktor, kabul | (artı) |
+| POST | `/muayeneler/{id}/epikriz` | doktor | (artı) Epikriz taslağı (bekleyen taslak varsa model yeniden çağrılmaz, o döner); vizit kapalıysa 409 |
+| POST | `/epikriz/{id}/karar` | doktor | (artı) `onayla` / `duzenle` / `reddet`; vizit kapalıysa 409 (103 kapanışta gitti) |
+| GET | `/outbox?takmaAd=` | doktor, kabul | (artı) Gönderim kutusu (son 50, en yeni ilk; takmaAd ile süzülür) |
+| POST | `/outbox/{id}/yeniden-dene` | doktor, kabul | (artı) Yalnız `IsKuraliHatasi` → `Bekliyor`; değilse 409 |
 | GET | `/health` | herkes | Isıtma / sağlık kontrolü (DB ping dahil) |
 
 ---

@@ -3,6 +3,7 @@ using KlinikAkis.Api.Gercekzaman;
 using KlinikAkis.Api.Kimlik;
 using KlinikAkis.Domain;
 using KlinikAkis.Domain.Varliklar;
+using KlinikAkis.Infrastructure.Outbox;
 using KlinikAkis.Infrastructure.Veri;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -195,14 +196,18 @@ public static class RandevuEndpointleri
         switch (e)
         {
             case RandevuEylemi.Kabul:
-                db.Kabuller.Add(new Kabul
+                var kabul = new Kabul
                 {
                     Id = Guid.NewGuid(),
                     RandevuId = randevu.Id,
                     KabulZamani = simdi,
                     TakipNo = TakipNo.Olustur(await db.Kabuller.CountAsync(ct) + 1),
                     KabulEden = kullanici.FindFirstValue(DemoClaim.Ad) ?? "",
-                });
+                };
+                db.Kabuller.Add(kabul);
+                // e-Nabız 101 Hasta Kayıt (simülasyon, SPEC §5.2): kabulle aynı kayıtta; kimlik yerine takma ad.
+                db.OutboxMesajlari.Add(OutboxGonderici.Paket(PaketTipi.HastaKayit, randevu.Hasta!.TakmaAd,
+                    new { takipNo = kabul.TakipNo, brans = randevu.Hekim!.Brans!.Kod.ToString(), kabulZamani = simdi }, simdi));
                 break;
             case RandevuEylemi.Cagir:
                 randevu.CagrilmaZamani = simdi;
@@ -213,6 +218,12 @@ public static class RandevuEndpointleri
             case RandevuEylemi.Kapat:
                 var muayene = await db.Muayeneler.FirstAsync(m => m.RandevuId == randevu.Id, ct);
                 muayene.Durum = MuayeneDurumu.Kapali;
+                // e-Nabız 103 Muayene (simülasyon): epikriz onaylı mı bilgisi taşınır, epikriz metni gitmez.
+                var epikrizOnayli = await db.Epikrizler.AnyAsync(x => x.MuayeneId == muayene.Id && x.Durum == EpikrizDurumu.Onaylandi, ct);
+                var takipNo = await db.Kabuller.Where(k => k.RandevuId == randevu.Id).Select(k => k.TakipNo).FirstOrDefaultAsync(ct);
+                db.OutboxMesajlari.Add(OutboxGonderici.Paket(PaketTipi.Muayene, randevu.Hasta!.TakmaAd,
+                    new { takipNo, brans = randevu.Hekim!.Brans!.Kod.ToString(), muayeneZamani = muayene.BaslangicZamani, epikrizOnayli },
+                    simdi));
                 break;
             case RandevuEylemi.Iptal:
                 randevu.Slot!.Dolu = false; // iptal edilen saat yeniden alınabilir

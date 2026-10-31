@@ -66,6 +66,18 @@ describe('TahlillerSekmesi', () => {
     expect(el.querySelector('svg[role="img"]')!.getAttribute('aria-label')).toBe('Trend: 6,8');
   });
 
+  it('AI taslağı olmadan yayınlanmış metin AI kartında değil, "Hekim yazdı" ile gösterilir', () => {
+    const s = satir('Normal', 13.2, null);
+    const { el } = kur({
+      ...s,
+      son: { ...s.son, hastayaYayinlandi: true },
+      aciklama: { ...s.aciklama, yayinlanan: 'Değeriniz normal.', yayinZamani: '2026-10-29T11:00:00Z', yayinlayanHekim: 'Uzm. Dr. Selin Arslan' },
+    });
+    expect(el.querySelector('[data-test="ai-karti"]')).toBeNull();
+    expect(el.textContent).not.toContain('kural tabanlı');
+    expect(el.querySelector('[data-test="hekim-aciklamasi"]')!.textContent).toContain('Hekim yazdı · Uzm. Dr. Selin Arslan');
+  });
+
   it('kritik değer: yayınla önce pencere açar, seçim yokken Yayınla pasif; seçimle bilgilendirme gönderilir', async () => {
     const { fixture, http } = kur(satir('KritikDusuk', 6.8, 'Kan değeriniz çok düşük.'));
 
