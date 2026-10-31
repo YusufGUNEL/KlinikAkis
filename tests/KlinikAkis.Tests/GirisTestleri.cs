@@ -133,7 +133,7 @@ public sealed class GirisTestleri(KlinikApiFabrikasi fabrika) : IClassFixture<Kl
         var kayit = await db.ErisimKayitlari.SingleAsync(k => k.HastaId == SenaryoIdleri.Zeynep);
         Assert.Equal("doktor", kayit.KullaniciRol);
         Assert.StartsWith("Uzm. Dr. ", kayit.KullaniciAd, StringComparison.Ordinal);
-        Assert.Equal("Görüntüledi", kayit.Eylem);
+        Assert.Equal("Hasta kaydını görüntüledi", kayit.Eylem);
         Assert.Equal(KlinikApiFabrikasi.Simdi.UtcDateTime, kayit.Zaman);
     }
 

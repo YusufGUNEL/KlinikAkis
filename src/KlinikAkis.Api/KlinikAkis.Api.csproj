@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <!-- Jwt:Key ve (Aşama 5) ANTHROPIC_API_KEY yerelde user-secrets'ta; repoya girmez -->
+    <!-- Jwt:Key ve GEMINI_API_KEY yerelde user-secrets'ta; repoya girmez -->
     <UserSecretsId>klinikakis-api</UserSecretsId>
   </PropertyGroup>
 

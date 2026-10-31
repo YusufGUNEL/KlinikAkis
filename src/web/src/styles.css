@@ -16,14 +16,29 @@
   --color-ai: #6d28d9;
 }
 
+/* Hasta ekranındaki yapışkan 112 bandı (~5rem) odaklanan/kaydırılan öğenin üstüne binmesin. */
+html {
+  scroll-padding-bottom: 6rem;
+}
+
 body {
   @apply bg-slate-50 font-sans text-slate-900;
   /* Sayılar hizalı: saat, değer, sıra no (SPEC §10.1 tabular-nums). */
   font-variant-numeric: tabular-nums;
 }
 
-/* Görünür odak halkası (WCAG 2.2 AA). */
-:focus-visible {
-  outline: 3px solid var(--color-ana);
-  outline-offset: 2px;
+/* Görünür odak halkası (WCAG 2.2 AA). base katmanında: öğe üstündeki Tailwind sınıfları
+   (kırmızı bantta focus-visible:outline-white, koddan odaklanan başlıkta outline-none) bunu ezebilsin. */
+@layer base {
+  :focus-visible {
+    outline: 3px solid var(--color-ana);
+    outline-offset: 2px;
+  }
+}
+
+/* İkincil (outlined) butonlar: PrimeNG varsayılanı mor kart zemininde 4,38:1 kalıyordu (SPEC §10.1 AA). */
+.p-button.p-button-outlined.ikincil,
+.p-button.p-button-text.ikincil {
+  color: var(--color-slate-800);
+  border-color: var(--color-slate-500);
 }

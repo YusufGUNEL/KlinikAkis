@@ -25,9 +25,48 @@ public sealed class MaskeleyiciTestleri
     [InlineData("0 532-123-45-67")]
     [InlineData("(532) 123 45 67")]
     [InlineData("532 123 4567")]
+    [InlineData("0532.123.45.67")]
+    [InlineData("0212 555 44 33")]
     public void Telefon_bicimleri_maskelenir(string telefon)
     {
         Assert.Equal("ara [TELEFON] lütfen", Maskeleyici.Maskele($"ara {telefon} lütfen"));
+    }
+
+    [Fact]
+    public void Ayiricili_tc_maskelenir()
+    {
+        var bosluklu = $"{GecerliTc[..3]} {GecerliTc[3..6]} {GecerliTc[6..9]} {GecerliTc[9..]}";
+        Assert.Equal("TC: [TC]", Maskeleyici.Maskele($"TC: {bosluklu}"));
+    }
+
+    // Denetçinin bulduğu kaçaklar: görünmez karakterle bölünmüş ad ve listede olmayan ekler.
+    [Theory]
+    [InlineData("Ay\u200Bşe Ka\u00ADya", "[AD] [SOYAD]")]
+    [InlineData("Ayşemin annesi", "[AD] annesi")]
+    [InlineData("Ayşeyken", "[AD]")]
+    [InlineData("Ayşegilde kaldım", "[AD] kaldım")]
+    [InlineData("AYŞEMİZ", "[AD]")]
+    [InlineData("Ays‍̧e", "[AD]")]
+    [InlineData("Ayşeninki", "[AD]")]
+    [InlineData("Ayşedeki", "[AD]")]
+    [InlineData("Ayşeydim", "[AD]")]
+    [InlineData("Kayadaki", "[SOYAD]")]
+    public void Gorunmez_karakter_ve_ek_kacaklari_maskelenir(string metin, string beklenen)
+    {
+        Assert.Equal(beklenen, Maskeleyici.Maskele(metin, "Ayşe", "Kaya"));
+    }
+
+    // Ünsüz yumuşaması ve ek-fiil: "Mehmet" → "Mehmed'in", "Mehmedin", "Mehmettir".
+    [Theory]
+    [InlineData("Mehmedin başı ağrıyor", "[AD] başı ağrıyor")]
+    [InlineData("Mehmed'in", "[AD]")]
+    [InlineData("Mehmettir", "[AD]")]
+    [InlineData("Mehmetti", "[AD]")]
+    [InlineData("ben Mehmettim", "ben [AD]")]
+    [InlineData("Tekinlerdeyiz", "[SOYAD]")]
+    public void Yumusama_ve_ek_fiil_maskelenir(string metin, string beklenen)
+    {
+        Assert.Equal(beklenen, Maskeleyici.Maskele(metin, "Mehmet", "Tekin"));
     }
 
     [Fact]

@@ -68,7 +68,7 @@ public static class RandevuEndpointleri
             if (onAnamnez is null)
                 return TypedResults.ValidationProblem(new Dictionary<string, string[]>
                 {
-                    ["onAnamnezId"] = ["Ön anamnez bu hastaya ait değil."],
+                    ["onAnamnezId"] = ["Bu şikayet kaydı size ait değil."],
                 });
             // Kırmızı bayrakta akış sunucuda da durur: arayüz atlatılsa bile randevu verilmez, 112 yönlendirmesi geçerli.
             if (onAnamnez.Durum == OnAnamnezDurumu.KirmiziBayrak)
@@ -276,7 +276,7 @@ public static class RandevuEndpointleri
             .Where(e => RandevuDurumMakinesi.DoktorEylemiMi(e) == doktorMu)
             .ToList();
         return new RandevuSatiri(r.Id, r.Slot!.Baslangic, r.SiraNo, r.Durum, r.HastaId, ad,
-            r.Hekim!.Brans!.Ad, $"{r.Hekim.Unvan} {r.Hekim.Ad}", r.Hekim.Oda, h.AcikRizaAlindi, takipNo, izinli);
+            r.Hekim!.Brans!.Ad, $"{r.Hekim.Unvan} {r.Hekim.Ad}", r.Hekim.Oda, h.AcikRizaAlindi, takipNo, izinli, r.OnAnamnezId);
     }
 }
 
@@ -288,4 +288,4 @@ public sealed record HastaRandevusu(
 public sealed record RandevuSatiri(
     Guid Id, DateTime Baslangic, string SiraNo, RandevuDurumu Durum, Guid HastaId, string HastaAd,
     string BransAd, string HekimAd, string Oda, bool AcikRizaAlindi, string? TakipNo,
-    IReadOnlyList<RandevuEylemi> IzinliEylemler);
+    IReadOnlyList<RandevuEylemi> IzinliEylemler, Guid? OnAnamnezId);

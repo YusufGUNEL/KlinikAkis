@@ -9,6 +9,8 @@ public static class OlayTuru
     public const string RandevuDurumDegisti = nameof(RandevuDurumDegisti);
     public const string KabulYapildi = nameof(KabulYapildi);
     public const string HastaCagrildi = nameof(HastaCagrildi);
+    public const string OnAnamnezHazir = nameof(OnAnamnezHazir);
+    public const string OnAnamnezKarar = nameof(OnAnamnezKarar);
     public const string DemoSifirlandi = nameof(DemoSifirlandi);
 }
 

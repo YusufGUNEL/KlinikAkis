@@ -79,6 +79,11 @@ public sealed class OnAnamnez
     public string SohbetJson { get; set; } = "[]";
     public string? AiTaslakJson { get; set; }
     public AiKaynak? Kaynak { get; set; }
+    /// <summary>Kart başlığı (SPEC §10.2): "AI taslağı · {model} · {saat}". Yedek/kuralda boş.</summary>
+    public string? AiModel { get; set; }
+    public DateTime? AiZamani { get; set; }
+    /// <summary>Günlük kota ya da sağlayıcı 429'u: model çağrılmadı, taslak kural tabanlı; hekim kartında rozet (§9.9).</summary>
+    public bool KotaDoldu { get; set; }
     public bool HastaOnayi { get; set; }
     public string? HastaNotu { get; set; }
     public string? HekimDuzeltmesi { get; set; }

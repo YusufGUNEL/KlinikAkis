@@ -20,7 +20,7 @@ Her oturumun başında SPEC.md'yi oku. SPEC ile çelişen bir şey yapmadan önc
   yanlış aralık vb.) `_calisma/AI_DUZELTMELER.md` dosyasına tarihli bir madde ekle.
 - Kütüphane/SDK sürümü, API adı veya kurulum adımı konusunda emin değilsen hafızadan yazma;
   doğrula: .NET → `microsoft-learn` MCP, Angular → `angular-cli` MCP, PrimeNG → `primeng` MCP,
-  diğer paketler → `context7` MCP, Claude API → `claude-api` skill'i.
+  diğer paketler ve Gemini API → `context7` MCP / ai.google.dev.
 - Paketler SPEC §3.1'deki kapalı listeden seçilir; listede olmayan paket için önce sor.
 - Görev dağılımı: aşama sonunda `.claude/agents/` altındaki denetçiler (`spec-denetci`,
   `ai-guvenlik-denetci`, `turkce-denetci`, `ui-denetci`) paralel çalıştırılır; kodu ana oturum yazar.
@@ -40,8 +40,8 @@ Her oturumun başında SPEC.md'yi oku. SPEC ile çelişen bir şey yapmadan önc
 - Türkçe yerel ayar (SPEC §10.5): `lang="tr"`, `29.10.2026`, ondalık virgül; Angular `uppercase`
   pipe yerine `trUpper`; sunucu `InvariantCulture`, Türkçe eşleşme yalnızca `TurkceMetin` içinde.
 - Zamanlar UTC `DateTime`; "bugün" Europe/Istanbul'a göre. Docker imajı Ubuntu `aspnet:10.0-noble` (ICU + tzdata; Alpine değil — .NET 10'da Debian imajı yok).
-- Claude API kullanırken model kimliğini ve C# SDK'nın `IChatClient` desteğini önce `claude-api`
-  skill'i / resmi dokümandan doğrula; hafızadan yazma.
+- LLM sağlayıcısı Gemini ücretsiz katmanı (OpenAI uyumlu uç + `Microsoft.Extensions.AI.OpenAI`); ücretli
+  sağlayıcı yok. Model adını ve şema desteğini context7 / ai.google.dev'den doğrula; hafızadan yazma.
 
 ## Komutlar (Aşama 0'dan sonra güncellenecek)
 - Backend: `dotnet run --project src/KlinikAkis.Api`

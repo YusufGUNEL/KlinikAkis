@@ -33,7 +33,7 @@ import { simdiSinyali } from '../ortak/simdi';
             <article class="rounded-lg border border-slate-200 p-4" [attr.aria-label]="r.bransAd + ' randevusu'">
               @if (r.durum === 'Cagrildi') {
                 <p class="-mx-4 -mt-4 mb-3 rounded-t-lg bg-bilgi px-4 py-3 font-semibold text-white" role="alert">
-                  <span aria-hidden="true">→</span> Sıranız geldi. Lütfen geçiniz: Oda {{ r.oda }}
+                  <span aria-hidden="true">→</span> Sıranız geldi. Lütfen geçin: Oda {{ r.oda }}
                 </p>
               }
               <p class="flex items-center justify-between gap-2">

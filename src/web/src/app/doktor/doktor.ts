@@ -1,9 +1,9 @@
 import { DatePipe } from '@angular/common';
 import { httpResource } from '@angular/common/http';
-import { Component, computed, ElementRef, inject, signal } from '@angular/core';
+import { afterNextRender, Component, computed, ElementRef, inject, Injector, signal } from '@angular/core';
 import { QRCodeComponent } from 'angularx-qrcode';
 import { ButtonModule } from 'primeng/button';
-import { HastaOzeti, RandevuEylemi, RandevuSatiri } from '../cekirdek/api';
+import { DenetimSatiri, ErisimSatiri, HastaOzeti, OnAnamnezDetayi, RandevuEylemi, RandevuSatiri } from '../cekirdek/api';
 import { HubService, hubIleYenile } from '../cekirdek/hub';
 import { EYLEM_ETIKETI, hataMesaji, RandevuIslemleri, saatEtiketi } from '../cekirdek/randevu';
 import { BaglantiGostergesi } from '../ortak/baglanti-gostergesi';
@@ -12,6 +12,8 @@ import { DurumRozeti } from '../ortak/durum-rozeti';
 import { HastaBandi } from '../ortak/hasta-bandi';
 import { simdiSinyali } from '../ortak/simdi';
 import { UstCubuk } from '../ortak/ust-cubuk';
+import { ModeleGidenVeri } from './modele-giden-veri';
+import { OnAnamnezKartiBileseni } from './onanamnez-karti';
 
 /** QR'ın açtığı senaryo hastası (Ayşe K., SPEC §6). */
 const QR_HASTA_ID = 'a1000000-0000-0000-0000-000000000001';
@@ -19,12 +21,23 @@ const DOKTOR_EYLEMLERI: RandevuEylemi[] = ['Cagir', 'Basla', 'Kapat'];
 
 /**
  * Doktor çalışma alanı, 3 sütun (taslak 4, Epic Storyboard düzeni): sol günün listesi (canlı), orta hasta
- * bandı + eylem çubuğu, sağ sessiz uyarılar / modele giden veri / erişim kaydı (sonraki aşamalar).
+ * bandı + eylem çubuğu + ön anamnez kartı, sağ sessiz uyarılar / modele giden veri / erişim kaydı.
  * Butonların etkinliği sunucudaki durum makinesinden gelen `izinliEylemler`dir; kural istemcide tekrarlanmaz.
  */
 @Component({
   selector: 'app-doktor',
-  imports: [BaglantiGostergesi, ButtonModule, DatePipe, DurumKutusu, DurumRozeti, HastaBandi, QRCodeComponent, UstCubuk],
+  imports: [
+    BaglantiGostergesi,
+    ButtonModule,
+    DatePipe,
+    DurumKutusu,
+    DurumRozeti,
+    HastaBandi,
+    ModeleGidenVeri,
+    OnAnamnezKartiBileseni,
+    QRCodeComponent,
+    UstCubuk,
+  ],
   template: `
     <div class="flex h-dvh flex-col text-sm">
       <app-ust-cubuk ekran="Doktor"><app-baglanti-gostergesi [durum]="hub.durum()" /></app-ust-cubuk>
@@ -106,18 +119,83 @@ const DOKTOR_EYLEMLERI: RandevuEylemi[] = ['Cagir', 'Basla', 'Kapat'];
             @if (r.durum === 'Planlandi') {
               <p class="px-4 py-3 text-slate-700">Hasta henüz kabul edilmedi; çağırmak için kabul masasını bekleyin.</p>
             }
+            <section class="p-4" aria-labelledby="onanamnez-baslik">
+              <h2 id="onanamnez-baslik" class="text-xs font-semibold tracking-wide text-slate-600 uppercase">Ön anamnez</h2>
+              <div class="mt-2 max-w-3xl">
+                @if (!r.onAnamnezId) {
+                  <app-durum-kutusu tur="bos" mesaj="Randevu şikayet sohbeti olmadan alındı; ön anamnez yok." />
+                } @else if (detay.hasValue()) {
+                  <app-onanamnez-karti [detay]="detay.value()" (degisti)="yenile()" />
+                } @else if (detay.error()) {
+                  <app-durum-kutusu tur="hata" (yenidenDene)="detay.reload()" />
+                } @else {
+                  <app-durum-kutusu tur="yukleniyor" />
+                }
+              </div>
+            </section>
+            @if (veriAcik() && sonDenetim(); as d) {
+              <section id="modele-giden-veri" class="border-t border-slate-200 p-4" aria-labelledby="mgv-baslik">
+                <h2 id="mgv-baslik" tabindex="-1" class="outline-none text-xs font-semibold tracking-wide text-slate-600 uppercase">Modele giden veri</h2>
+                <div class="mt-2 max-w-4xl"><app-modele-giden-veri [kayit]="d" /></div>
+              </section>
+            }
           } @else {
             <div class="p-4"><app-durum-kutusu tur="bos" mesaj="Listeden bir hasta seçin." /></div>
           }
         </main>
 
         <aside class="overflow-y-auto border-l border-slate-200 bg-white p-3" aria-label="Yan panel">
-          @for (bolum of yanBolumler; track bolum.baslik) {
-            <section class="border-b border-slate-100 py-3 first:pt-0" [attr.aria-label]="bolum.baslik">
-              <h2 class="text-xs font-semibold tracking-wide text-slate-600 uppercase">{{ bolum.baslik }}</h2>
-              <p class="mt-1 text-slate-700">{{ bolum.bos }}</p>
-            </section>
-          }
+          <section class="border-b border-slate-100 pb-3" aria-labelledby="uyarilar-baslik">
+            <h2 id="uyarilar-baslik" class="text-xs font-semibold tracking-wide text-slate-600 uppercase">Uyarılar</h2>
+            <p class="mt-1 text-slate-700">Uyarı yok.</p>
+          </section>
+          <section class="border-b border-slate-100 py-3" aria-labelledby="mgv-yan-baslik">
+            <h2 id="mgv-yan-baslik" class="text-xs font-semibold tracking-wide text-slate-600 uppercase">Modele giden veri</h2>
+            @if (sonDenetim(); as d) {
+              <p class="mt-1 text-slate-700">
+                <span class="tabular-nums">{{ d.zaman | date: 'HH:mm' }}</span> · {{ d.saglayici }} ·
+                {{ d.saglayici === 'Kural' ? 'model çağrılmadı' : d.yedegeDustu ? 'yedek' : 'model yanıtı' }}
+              </p>
+              <button
+                pButton
+                type="button"
+                size="small"
+                variant="outlined"
+                class="mt-2"
+                aria-controls="modele-giden-veri"
+                [attr.aria-expanded]="veriAcik()"
+                (click)="veriDegistir()"
+              >
+                {{ veriAcik() ? 'Gizle' : 'Göster' }}
+              </button>
+            } @else if (denetim.error()) {
+              <p class="mt-1 text-uyari" role="alert"><span aria-hidden="true">⚠</span> Yüklenemedi.</p>
+              <button pButton type="button" size="small" variant="outlined" class="mt-2" (click)="denetim.reload()">Yeniden dene</button>
+            } @else if (denetim.isLoading()) {
+              <p class="mt-1 text-slate-600">Yükleniyor…</p>
+            } @else {
+              <p class="mt-1 text-slate-700">{{ secili() ? 'Henüz model çağrısı yok.' : 'Hasta seçilmedi.' }}</p>
+            }
+          </section>
+          <section class="py-3" aria-labelledby="erisim-baslik">
+            <h2 id="erisim-baslik" class="text-xs font-semibold tracking-wide text-slate-600 uppercase">Erişim kaydı</h2>
+            @if (erisim.hasValue() && erisim.value().length) {
+              <ol class="mt-1 flex flex-col gap-1" data-test="erisim-kaydi">
+                @for (e of erisim.value().slice(0, 8); track e.id) {
+                  <li class="text-slate-700">
+                    <span class="tabular-nums">{{ e.zaman | date: 'HH:mm' }}</span> · {{ e.kullaniciAd }} · {{ e.eylem }}
+                  </li>
+                }
+              </ol>
+            } @else if (erisim.error() || ozet.error()) {
+              <p class="mt-1 text-uyari" role="alert"><span aria-hidden="true">⚠</span> Yüklenemedi.</p>
+              <button pButton type="button" size="small" variant="outlined" class="mt-2" (click)="erisimYenile()">Yeniden dene</button>
+            } @else if (erisim.isLoading() || ozet.isLoading()) {
+              <p class="mt-1 text-slate-600">Yükleniyor…</p>
+            } @else {
+              <p class="mt-1 text-slate-700">{{ secili() ? 'Kayıt yok.' : 'Hasta seçilmedi.' }}</p>
+            }
+          </section>
         </aside>
       </div>
     </div>
@@ -149,17 +227,60 @@ export class Doktor {
     const id = this.seciliHastaId();
     return id ? `/api/hastalar/${id}/ozet` : undefined;
   });
-
+  private readonly seciliOnAnamnezId = computed(() => this.secili()?.onAnamnezId);
+  protected readonly detay = httpResource<OnAnamnezDetayi>(() => {
+    const id = this.seciliOnAnamnezId();
+    return id ? `/api/onanamnez/${id}` : undefined;
+  });
   // Başlıklar CSS uppercase ile büyür: lang="tr" olduğu için "Erişim" → "ERİŞİM" doğru çıkar (SPEC §10.5).
-  protected readonly yanBolumler = [
-    { baslik: 'Uyarılar', bos: 'Uyarı yok.' },
-    { baslik: 'Modele giden veri', bos: 'Henüz AI çağrısı yok.' },
-    { baslik: 'Erişim kaydı', bos: 'Sonraki aşamada gösterilecek.' },
-  ];
+  protected readonly denetim = httpResource<DenetimSatiri[]>(() => {
+    const id = this.seciliHastaId();
+    return id ? { url: '/api/ai/denetim', params: { hastaId: id } } : undefined;
+  });
+  // Panel seçili kartın çağrısını göstersin: hastanın sonradan başlattığı başka bir sohbetin kaydını değil.
+  // Taslak zamanı hat bittikten sonra yazılır; kartın kaydı o andan önceki en yeni kayıttır (liste yeniden eskiye).
+  protected readonly sonDenetim = computed(() => {
+    if (!this.denetim.hasValue()) return null;
+    const kayitlar = this.denetim.value();
+    const kartZamani = this.detay.hasValue() ? this.detay.value().kart?.zaman : undefined;
+    if (!kartZamani) return kayitlar[0] ?? null;
+    const sinir = Date.parse(kartZamani);
+    return kayitlar.find((k) => Date.parse(k.zaman) <= sinir) ?? kayitlar[0] ?? null;
+  });
+  protected readonly veriAcik = signal(false);
+  // Hasta özeti çekilince "Hasta kaydını görüntüledi" satırı yazılır; kayıt ondan sonra okunsun ki o satır da gelsin.
+  protected readonly erisim = httpResource<ErisimSatiri[]>(() => {
+    const id = this.seciliHastaId();
+    return id && this.ozet.hasValue() ? `/api/hastalar/${id}/erisim` : undefined;
+  });
+  private readonly injector = inject(Injector);
 
   constructor() {
     this.hub.baglan();
-    hubIleYenile(this.liste);
+    hubIleYenile(this.liste, this.detay, this.denetim, this.erisim);
+  }
+
+  /** Panel ana alanın altında açılır: görünür alana kaydır, odağı başlığına ver. */
+  protected veriDegistir(): void {
+    this.veriAcik.set(!this.veriAcik());
+    if (this.veriAcik())
+      afterNextRender(() => this.kok.nativeElement.querySelector<HTMLElement>('#mgv-baslik')?.focus(), {
+        injector: this.injector,
+      });
+  }
+
+  /** Erişim kaydı özete bağlı: özet düştüyse önce o yeniden çekilir, erişim kendiliğinden gelir. */
+  protected erisimYenile(): void {
+    if (this.ozet.error()) this.ozet.reload();
+    else this.erisim.reload();
+  }
+
+  /** Karar sonrası: kart, liste ve yan panel (erişim kaydı yeni satır aldı). */
+  protected yenile(): void {
+    this.liste.reload();
+    this.detay.reload();
+    this.denetim.reload();
+    this.erisim.reload();
   }
 
   protected saat(iso: string): string {

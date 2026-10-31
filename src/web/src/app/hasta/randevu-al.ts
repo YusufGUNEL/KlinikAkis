@@ -1,5 +1,5 @@
 import { httpResource } from '@angular/common/http';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, linkedSignal, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { BransOgesi, SlotOgesi } from '../cekirdek/api';
@@ -9,7 +9,7 @@ import { simdiSinyali } from '../ortak/simdi';
 
 /**
  * Randevu alma: bölüm seç → saat seç → onayla. Şikayet sohbetinden gelindiyse (?onAnamnez=) randevu o ön
- * anamneze bağlanır. Bölüm şimdilik elle seçilir; Aşama 5'te sohbetin önerdiği bölüm ön seçili gelir.
+ * anamneze bağlanır ve önerilen bölüm (?brans=) ön seçili gelir; hasta "Değiştir" ile başka bölüm seçebilir.
  */
 @Component({
   selector: 'app-randevu-al',
@@ -89,10 +89,11 @@ import { simdiSinyali } from '../ortak/simdi';
 export class RandevuAl {
   private readonly islemler = inject(RandevuIslemleri);
   private readonly router = inject(Router);
-  private readonly onAnamnezId = inject(ActivatedRoute).snapshot.queryParamMap.get('onAnamnez');
+  private readonly sorgu = inject(ActivatedRoute).snapshot.queryParamMap;
+  private readonly onAnamnezId = this.sorgu.get('onAnamnez');
+  private readonly onerilenBransId = this.sorgu.get('brans');
 
   private readonly simdi = simdiSinyali();
-  protected readonly brans = signal<BransOgesi | null>(null);
   protected readonly secili = signal<SlotOgesi | null>(null);
   protected readonly gonderiliyor = signal(false);
   protected readonly hata = signal('');
@@ -100,6 +101,10 @@ export class RandevuAl {
   protected readonly branslar = httpResource<BransOgesi[]>(() => '/api/branslar');
   protected readonly acikBranslar = computed(() =>
     this.branslar.hasValue() ? this.branslar.value().filter((b) => b.hekimSayisi > 0) : [],
+  );
+  // Liste gelince önerilen bölüm seçili başlar; hasta seçimi değiştirebilir.
+  protected readonly brans = linkedSignal<BransOgesi | null>(
+    () => this.acikBranslar().find((b) => b.id === this.onerilenBransId) ?? null,
   );
   protected readonly slotlar = httpResource<SlotOgesi[]>(() => {
     const b = this.brans();

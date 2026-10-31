@@ -4,10 +4,16 @@
     <ProjectReference Include="..\KlinikAkis.Domain\KlinikAkis.Domain.csproj" />
   </ItemGroup>
 
+  <!-- Sürümlü istemler (SPEC §9.7): derlemeye gömülür; sürüm denetim kaydına yazılır -->
+  <ItemGroup>
+    <EmbeddedResource Include="Ai\Prompts\*.md" LogicalName="Prompts.%(Filename)%(Extension)" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Bogus" Version="35.6.5" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.14" />
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.11.0" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.11.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
   </ItemGroup>
 

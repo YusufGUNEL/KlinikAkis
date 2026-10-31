@@ -71,8 +71,8 @@ Sentetik hasta **"Ayşe K., 54, K"** (Tip 2 DM takibinde, penisilin alerjisi) il
 | Gerçek zamanlı | **SignalR** (tek hub, sunucu tarafı gruplar) | Tek örnek; backplane yok (§14) |
 | ORM | **EF Core 10**, sağlayıcıdan bağımsız model | **Migration yok**: `EnsureCreated` + seed (§5.3) |
 | Veritabanı | Geliştirme: **SQLite** (kurulum yok, ağsız) · Yayın: **PostgreSQL** (Neon ücretsiz) · İsteğe bağlı: Oracle Free (docker) | `Db:Provider` = `Sqlite` \| `Postgres` |
-| AI erişimi | **Microsoft.Extensions.AI `IChatClient`**, `GetResponseAsync<T>` ile tipli çıktı | Sağlayıcı `appsettings`'ten: `Anthropic` / `Ollama` / `Fake` |
-| LLM | Varsayılan: Claude (hız için Haiku sınıfı, epikriz için Sonnet sınıfı). Yerel: Ollama + Qwen3 8B (Ollama'da Türkçe bir model varsa o da denenir) | Model kimliği, C# SDK'nın `IChatClient` ve JSON şema desteği **yazmadan önce** `claude-api` skill'i / resmi dokümandan doğrulanır |
+| AI erişimi | **Microsoft.Extensions.AI `IChatClient`**, `ChatOptions.ResponseFormat` (JSON şema) ile tipli çıktı; ham yanıt denetime yazılsın diye `GetResponseAsync<T>` yerine sunucuda elle doğrulanır | Sağlayıcı `appsettings`'ten: `Gemini` / `Ollama` / `Fake` |
+| LLM | Varsayılan: **Google Gemini API ücretsiz katmanı** (`gemini-3.5-flash-lite`, Google AI Studio anahtarı), OpenAI uyumlu uç üzerinden. **Ücretli sağlayıcı yok.** Yerel: Ollama + Qwen3 8B (Ollama'da Türkçe bir model varsa o da denenir) | Model adı ve JSON şema desteği **yazmadan önce** context7 / resmi dokümandan (ai.google.dev) doğrulanır |
 | Sentetik veri | **Bogus** (`tr` yereli, sabit seed) + elle yazılmış 6 senaryo | |
 | Frontend | **Angular** (`ng new` hangi kararlı sürümü verirse), standalone + signals + reactive forms, rol başına lazy route | Deneysel API (Signal Forms) kullanılmaz |
 | UI | **PrimeNG** (Aura teması, ana renk teal) + **Tailwind** (PrimeNG'nin resmi Tailwind entegrasyonu, kurulum anında dokümandan doğrulanır) | Grafik: PrimeNG Chart (Chart.js) |
@@ -86,7 +86,7 @@ Sentetik hasta **"Ayşe K., 54, K"** (Tip 2 DM takibinde, penisilin alerjisi) il
 
 | Alan | Paket | Neden |
 |---|---|---|
-| AI | `Microsoft.Extensions.AI` + sağlayıcı paketi (Anthropic SDK, Ollama) · `ChatClientBuilder().UseLogging()` | Tek arayüz; istek/yanıt günlüğü ara katmanla, elle değil |
+| AI | `Microsoft.Extensions.AI` + `Microsoft.Extensions.AI.OpenAI` (Gemini'nin ve Ollama'nın OpenAI uyumlu uçları; ayrı sağlayıcı paketi yok) · `ChatClientBuilder().UseLogging()` | Tek arayüz; sağlayıcı yalnızca `Endpoint` + model ayarıyla değişir. İstek/yanıt günlüğü ara katmanla, elle değil |
 | Doğrulama | .NET 10 yerleşik Minimal API doğrulaması (`AddValidation`, DataAnnotations) | FluentValidation gereksiz; yoksa (sürüm doğrulanınca) DataAnnotations + endpoint filtresi |
 | Hız sınırı | Yerleşik `Microsoft.AspNetCore.RateLimiting` | §9.9 |
 | Demo JWT | `Microsoft.AspNetCore.Authentication.JwtBearer` (token üretimi geçişli gelen `Microsoft.IdentityModel.JsonWebTokens` ile) | §7, §8 (SignalR `access_token`); Aşama 2'de kullanıcı onayıyla eklendi |
@@ -147,14 +147,14 @@ gösterilir. `DateTimeOffset` kullanılmaz (SQLite sağlayıcısı sıralayamaz)
 | **Slot** | Id, HekimId, Baslangic (UTC), SureDk (10), Dolu |
 | **Randevu** | Id, HastaId, HekimId, SlotId, Durum (§5.1), SiraNo (örn. A-017, branş+gün içinde artan), OnAnamnezId? |
 | **Kabul** | Id, RandevuId, KabulZamani, TakipNo (`SIM-000123`, simülasyon, ASCII), KabulEden |
-| **OnAnamnez** | Id, HastaId, RandevuId? (randevu oluşunca bağlanır), SohbetJson (adım, soru, cevap), AiTaslakJson, Kaynak (`Llm` \| `Yedek` \| `Kural`), HastaOnayi (bool + hasta notu), HekimDuzeltmesi (metin?), Durum (`Sohbette`, `KirmiziBayrak`, `Taslak`, `Onaylandi`, `Duzenlendi`, `Reddedildi`), OnaylayanHekimId, OnayZamani, KirmiziBayrakKurali? |
+| **OnAnamnez** | Id, HastaId, RandevuId? (randevu oluşunca bağlanır), SohbetJson (adım, soru, cevap), AiTaslakJson, Kaynak (`Llm` \| `Yedek` \| `Kural`), HastaOnayi (bool + hasta notu), HekimDuzeltmesi (metin?), Durum (`Sohbette`, `KirmiziBayrak`, `Taslak`, `Onaylandi`, `Duzenlendi`, `Reddedildi`), OnaylayanHekimId, OnayZamani, KirmiziBayrakKurali?, AiModel?, AiZamani?, KotaDoldu (bool). AiTaslakJson §9.5 şemasıdır; `Siddet` (`Hafif`/`Orta`/`Siddetli`) ve `Aciliyet` (`Rutin`/`Oncelikli`) enum'ları oradan gelir ve değerlerini kod belirler |
 | **Muayene** | Id, RandevuId, BaslangicZamani, HekimNotu, Tanilar (ICD-10 kod listesi, artı aşamada), Durum (`Acik`, `Kapali`) |
 | **TahlilTanimi** | Id, Ad, HastaDostuAd ("Şeker ortalaması"), LoincKodu, Birim, AltSinir, UstSinir, CinsiyeteGore (K/E ayrı aralık), KritikAlt?, KritikUst?, Not ("örnek aralık, laboratuvara göre değişir") |
 | **TahlilSonucu** | Id, HastaId, TahlilTanimiId, Deger (decimal), Zaman, Isaret (kodla hesaplanır: `Normal`, `Yuksek`, `Dusuk`, `KritikYuksek`, `KritikDusuk`), AiAciklamaTaslak, YayinlananAciklama?, HastayaYayinlandi (bool + zaman + hekim) |
 | **Epikriz** (artı) | Id, MuayeneId, AiTaslak, SonMetin?, Kaynak, Durum (`Taslak`, `Onaylandi`, `Reddedildi`), OnaylayanHekimId |
 | **OutboxMesaji** (artı) | Id, PaketTipi (101 Hasta Kayıt, 103 Muayene, 105 Lab Sonuç), HastaTakmaAdi, PayloadJson, Durum (`Bekliyor`, `Gonderildi`, `IsKuraliHatasi`), Deneme, Zaman, Hata |
-| **AiAuditLog** | Id, Zaman, Ozellik (`OnAnamnez`, `TahlilAciklama`, `Epikriz`), HastaId? (panel süzgeci; modele gitmez), Saglayici (`Anthropic`/`Ollama`/`Fake`/`Kural`), Model, IstemSurumu, MaskeliGirdi (metin), GirdiHash (SHA-256), CiktiJson, GecikmeMs, Basarili, YedegeDustu (bool), Neden? ("zaman aşımı", "geçersiz bölüm", "kota", kural adı) |
-| **ErisimKaydi** | Id, Zaman, KullaniciRol, KullaniciAd, HastaId, Eylem ("Görüntüledi", "Onayladı", "Düzenledi", "Reddetti", "Yayınladı") |
+| **AiAuditLog** | Id, Zaman, Ozellik (`OnAnamnez`, `TahlilAciklama`, `Epikriz`), HastaId? (panel süzgeci; modele gitmez), Saglayici (`Gemini`/`Ollama`/`Fake`/`Kural`), Model, IstemSurumu, MaskeliGirdi (metin), GirdiHash (SHA-256), CiktiJson, GecikmeMs, Basarili, YedegeDustu (bool), Neden? ("zaman aşımı", "geçersiz bölüm", "kota", kural adı) |
+| **ErisimKaydi** | Id, Zaman, KullaniciRol, KullaniciAd, HastaId, Eylem (tam cümle: "Hasta kaydını görüntüledi", "Ön anamnezi onayladı / düzenledi / reddetti", sonraki aşamalarda "… yayınladı") |
 
 **SQLite notu:** SQLite sağlayıcısı `decimal` üzerinde sıralama/karşılaştırma yapamaz. `OnModelCreating`
 içinde `Database.IsSqlite()` ise decimal alanlara `HasConversion<double>()` uygulanır; Postgres'te `numeric`.
@@ -276,10 +276,10 @@ Tümü `/api` altında, JSON. Hata formatı ProblemDetails. Rol kontrolü JWT cl
 ```
 girdi → [maskeleme] → [kural kontrolü] ──(kural tetiklendi)──► kural sonucu (LLM yok)
                               │
-                       [kota / hız sınırı] ──(aşıldı)──► Fake yanıt + "demo kotası" rozeti
+                       [kota / hız sınırı] ──(aşıldı)──► kural tabanlı yedek + "demo kotası" rozeti
                               │
                               ▼
-                      IChatClient (Anthropic | Ollama | Fake)   ← 15 sn zaman aşımı
+                      IChatClient (Gemini | Ollama | Fake)      ← 15 sn zaman aşımı
                               │  JSON şema, enum'lar
                               ▼
                      [sunucu doğrulaması] ──(geçersiz/hata/zaman aşımı)──► kural tabanlı yedek
@@ -289,6 +289,10 @@ girdi → [maskeleme] → [kural kontrolü] ──(kural tetiklendi)──► ku
 ```
 Kural kontrolü maskelenmemiş ham metin üzerinde sunucu içinde çalışır (veri dışarı çıkmaz);
 modele yalnızca maskeli metin gider. Her dal (kural, kota, yedek, başarı) denetim kaydı yazar.
+Ön anamnezde "SignalR olayı" adımı randevu alınınca gelen `RandevuAlindi` olayıdır (kart randevuyla birlikte doktor
+ekranına düşer); hasta özete not eklerse `OnAnamnezHazir`, hekim karar verirse `OnAnamnezKarar` yayınlanır.
+Şiddet, aciliyet ve "18 yaş altında önce Çocuk Sağlığı" kararı da kodda: model değeri ne olursa olsun sohbet
+cevaplarından hesaplanıp üstüne yazılır; yetişkine Çocuk Sağlığı önerisi reddedilir (yedeğe düşülür).
 
 ### 9.2 Maskeleme (`Maskeleyici`, Infrastructure)
 - **TC:** 11 hane, ilk hane ≠ 0, sağlama geçerli → `[TC]`. Sağlama: `h10 = ((h1+h3+h5+h7+h9)*7 −
@@ -358,8 +362,10 @@ SDK şemayı yerel olarak iletmiyorsa: şema istemde verilir, doğrulama zaten z
 - Doktor önizler/düzenler → "Hastaya yayınla". Hasta yalnızca `YayinlananAciklama`'yı görür.
 
 ### 9.7 Sağlayıcılar ve istemler
-- `AI:Provider` = `Anthropic` | `Ollama` | `Fake`. Anahtar ortam değişkeninden / user-secrets'tan
-  (`ANTHROPIC_API_KEY`), asla repoda değil.
+- `AI:Provider` = `Gemini` | `Ollama` | `Fake`; `AI:Model` (varsayılan `gemini-3.5-flash-lite`).
+  Gemini, OpenAI uyumlu uçla (`https://generativelanguage.googleapis.com/v1beta/openai/`) bağlanır.
+  Anahtar ortam değişkeninden / user-secrets'tan (`GEMINI_API_KEY`), asla repoda değil. Anahtar yoksa
+  uyarı yazılır, Fake kullanılır (demo kırılmaz).
 - `FakeChatClient`: senaryo hastaları için hazır JSON döner; yapılandırılabilir gecikme ve hata
   (testlerde zaman aşımı/geçersiz JSON üretmek için). Çağrı sayacı vardır.
 - Zaman aşımı 15 sn; aşılırsa yedek. `MaxOutputTokens` her özellik için sınırlı.
@@ -376,9 +382,12 @@ SDK şemayı yerel olarak iletmiyorsa: şema istemde verilir, doğrulama zaten z
 ### 9.9 Maliyet ve kötüye kullanım
 - Herkese açık URL'de LLM uç noktaları (`ozet`, `aciklama`, `epikriz`) ASP.NET Core rate limiter ile
   IP başına dakikada 10 istek; aşımda 429 ProblemDetails.
-- Günlük toplam LLM çağrı kotası `AI:GunlukLimit` (varsayılan 300). Aşılınca o gün otomatik `Fake`
-  + kartta "demo kotası doldu · örnek yanıt" rozeti; denetim kaydına `Neden=kota`.
-- Anthropic konsolunda ayrıca aylık harcama limiti konur (kullanıcı yapar).
+- Günlük toplam LLM çağrı kotası `AI:GunlukLimit` (varsayılan 300). Aşılınca o gün model çağrılmaz; taslak
+  hastanın kendi cevaplarından kural tabanlı yedekle üretilir + kartta "demo kotası doldu · otomatik taslak"
+  rozeti; denetim kaydına `Neden=kota`. (Hazır örnek yanıt kullanılmaz: başka bir hastanın öyküsü yanlışlıkla
+  onaylanıp kayda geçebilirdi.) Kota yalnızca gerçek sağlayıcı çağrılarını sayar; `Fake` modda sayılmaz.
+- Gemini ücretsiz katmanı kullanılır, projede faturalandırma açılmaz → ücret oluşamaz. Gemini 429 (kota)
+  dönerse günlük kota kuralıyla aynı davranılır: kural tabanlı yedek + "demo kotası" rozeti, `Neden=kota`.
 
 ---
 
@@ -410,7 +419,9 @@ Kurallar: renk asla tek ipucu değil (ikon + metin); WCAG 2.2 AA; hasta butonlar
 
 ### 10.2 AI kartı davranışı
 - Mor ton + kesik çizgi + üstte "AI taslağı · klinik karar hekime aittir · {model} · {saat}".
-  Yedekse: "Otomatik taslak · model yanıt vermedi, kural tabanlı · {saat}".
+  Yedekse: "Otomatik taslak · model yanıt vermedi, kural tabanlı · {saat}" (kota dalında "model çağrılmadı (kota)").
+  Kırmızı bayrakta: "Otomatik taslak · kural tabanlı, model çağrılmadı". Hasta ekranında başlık her durumda
+  "AI taslağı · tanı değildir · {saat}"; model adı, iç işleyiş ve kota rozeti hastaya gösterilmez.
 - Her madde kaynağına bağlı (hangi sohbet adımı / hangi tahlil); kaynak yoksa "kaynak yok" işareti.
 - Butonlar: **Onayla / Düzenle / Reddet**. Onaydan sonra kesik çizgi düz olur, "Dr. X onayladı 14:32".
 - Uydurma yüzde güven skoru **yok**.
@@ -455,19 +466,20 @@ Doktor ekranında hasta ekranını telefonda açtıran **QR kod**: `https://<ori
 ┌──────────────────────────────┐
 │ Doktorunuza gidecek özet      │
 │ ┆ AI taslağı · tanı değildir ┆│
-│ ┆ • Birkaç haftadır çok su   ┆│
-│ ┆   içme, sık idrar          ┆│
-│ ┆ • Halsizlik                ┆│
+│ ┆ Şikayet: çok su içiyorum,  ┆│
+│ ┆   sık idrara çıkıyorum     ┆│
+│ ┆ Süre: Daha uzun            ┆│
+│ ┆ Önerilen bölüm:            ┆│
+│ ┆   Endokrinoloji            ┆│
+│ ┆ Alternatif: Dahiliye       ┆│
 │ [Düzelt]          [Doğru ✓]  │
 ├──────────────────────────────┤
-│ Önerilen bölüm: Endokrinoloji │
-│ Neden: susama + sık idrar,    │
-│        bilinen diyabet        │
-│ Alternatif: Dahiliye          │
 │ [Bugün 14:20 Dr. A.] [15:00]  │
 │ [ Randevuyu onayla ]  (48px)  │
 └──────────────────────────────┘
 ```
+Hasta yalnızca kendi cevaplarını ve kodda doğrulanmış bölüm önerisini görür; modelin serbest metni (özet,
+gerekçe, sorular, aciliyet) hekim onayı olmadan hastaya gösterilmez, yalnızca hekim kartına gider.
 
 **3. Hasta — tahlil sonucu ve trend**
 ```
@@ -518,7 +530,8 @@ Butonlar yalnızca durum makinesine uygun olduğunda etkin. Tablolar 32-36 px sa
 **6. Modele giden veri paneli (yan panel)**
 ```
 │ Gönderilen istem (maskeli)            │ Denetim                │
-│ hasta: P-7F3A · yaş: 50-59 · K        │ model: <sağlayıcı/ad>  │
+│ hasta: P-7F3A · yaş: 50-59 ·          │ model: <sağlayıcı/ad>  │
+│ cinsiyet: kadın · çocuk: hayır        │                        │
 │ şikayet: "[AD] olarak birkaç haftadır │ istem v1 · 1,8 sn      │
 │ çok su içiyorum..."                   │ girdi hash: a91c…      │
 │ telefon: [TELEFON] · TC: [TC]         │ yedek: hayır           │
@@ -601,7 +614,7 @@ Her aşama kendi testlerini **o aşamada** yazar; Aşama 9 eksik kalan varsa tam
 - Render ücretsiz web servisi (Docker) + Neon Postgres. Render'ın verdiği `PORT` değişkeni
   `Program.cs`'te okunur. Ters vekil arkasında `ForwardedHeaders` (imajda `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`). Health check yolu `/api/health`.
 - Ortam değişkenleri: `ConnectionStrings__Default` (Neon, `SSL Mode=Require`), `Db__Provider=Postgres`,
-  `AI__Provider`, `ANTHROPIC_API_KEY`, `Jwt__Key`, `AI__GunlukLimit`. Angular derlemesi için
+  `AI__Provider` (Render'da `Gemini`), `GEMINI_API_KEY`, `Jwt__Key`, `AI__GunlukLimit`. Angular derlemesi için
   `PRIMEUI_LICENSE` (Docker build argümanı; PrimeNG 22 PrimeUI License ile gelir, ücretsiz Community
   anahtarı yoksa sayfada lisans uyarısı çıkar). Yerelde `src/web/.primeui-license` dosyası; ikisi de repoya girmez. `src/web/scripts/lisans-yaz.mjs`
   (`npm start/build/test` öncesi çalışır) anahtarı ignore edilen `src/app/lisans.ts`'e yazar.
@@ -679,12 +692,14 @@ Zaman daralırsa sıra: Aşama 0-6 + 9 kesin; 7'nin ilk maddesi (epikriz); geri 
 - Testler 1-4 (1 için `AiHatti` iskeleti + Fake yeterli).
 
 ### 13.5 LLM entegrasyonu + ön anamnez kartı
-- Önce `claude-api` skill'i ile model kimlikleri ve Anthropic C# SDK'nın `IChatClient` + şema desteği doğrulanır.
-- `AiHatti` (§9.1), Anthropic + Fake istemciler, §9.5 şema ve doğrulama, yedek, zaman aşımı, kota ve
+- Önce Gemini OpenAI uyumlu ucunun şema desteği ve güncel ücretsiz model adı (context7 / ai.google.dev) ile
+  `Microsoft.Extensions.AI.OpenAI` `AsIChatClient` + `ChatResponseFormat.ForJsonSchema` (microsoft-learn) doğrulanır.
+  (`GetResponseAsync<T>` yerine `ResponseFormat` + sunucu doğrulaması: modelin ham çıktısı denetim kaydına aynen yazılır.)
+- `AiHatti` (§9.1), Gemini + Fake istemciler, §9.5 şema ve doğrulama, yedek, zaman aşımı, kota ve
   rate limiter (§9.9), `AiAuditLog`, istem dosyası v1, enjeksiyon önlemi (§9.8).
 - Hasta özet onayı (taslak 2), doktor kartı (§10.2), "Modele giden veri" paneli (taslak 6), erişim kaydı.
-- API anahtarı: `dotnet user-secrets set "ANTHROPIC_API_KEY" ...` (kullanıcı kendi yazar).
-- Testler 6, 7; Senaryo 1 ve 2 hem Anthropic hem Fake ile baştan sona.
+- API anahtarı: `dotnet user-secrets set "GEMINI_API_KEY" ...` (kullanıcı kendi yazar; AI Studio anahtarı).
+- Testler 6, 7; Senaryo 1 ve 2 hem Gemini hem Fake ile baştan sona.
 
 ### 13.6 Tahliller
 - `TahlilDegerlendirici` + test 5; tahlil sekmesi (taslak 5), sparkline, LOINC; açıklama üretimi (§9.6);
@@ -692,7 +707,7 @@ Zaman daralırsa sıra: Aşama 0-6 + 9 kesin; 7'nin ilk maddesi (epikriz); geri 
 - Hasta sonuç ekranı (taslak 3): aralık çubuğu, işaret etiketi (§10.1), trend, sabit uyarı. Test 8.
 
 ### 13.7 Artılar I — her biri ayrı durak
-(a) Epikriz taslağı (muayene + onaylı anamnez + tahlillerden; Sonnet sınıfı; onayla/düzenle/reddet).
+(a) Epikriz taslağı (muayene + onaylı anamnez + tahlillerden; `AI:Model` ayarıyla daha güçlü model, ör. `gemini-3.8-flash`; onayla/düzenle/reddet).
 (b) TV sıra ekranı (taslak 8; çağrı canlı; son 3 çağrı). (c) Outbox + `OutboxIsleyici` (§5.2, taslak 9).
 
 ### 13.8 Artılar II
@@ -729,4 +744,6 @@ Son deploy, `/health` ısıtma, §1.3 kontrol listesi, iki cihazda 3 prova (mobi
 - e-Nabız ve takip numaraları simülasyondur; gerçek servise bağlanılmaz.
 - Şema `EnsureCreated` ile kurulur (migration yok); üretimde migration'a geçilir.
 - SignalR tek örnekte çalışır; yatay ölçekte Redis backplane gerekir.
+- Ücretsiz Gemini katmanında Google girdileri ürün geliştirmede kullanabilir; demo verisi sentetik ve
+  maskeli olduğu için kabul edildi. Gerçek hasta verisinde ücretli katman veya yerel model (Ollama) gerekir.
 - Tıbbi cihaz değildir; AI çıktıları hekim onayı bekleyen taslaktır.

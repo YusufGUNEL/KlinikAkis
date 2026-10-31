@@ -26,33 +26,50 @@ public static partial class Maskeleyici
         // Kendini tanıtma ve iyelik: "Ben Ayşeyim", "Kayayım", "Ayşem", "Ayşeciğim", "Kayalardan".
         "yim", "yum", "im", "um", "m", "yiz", "yuz", "iz", "uz", "ymis", "ymus", "mis", "mus",
         "cik", "cigim", "cim", "lerin", "larin", "leri", "lari", "lere", "lara", "lerden", "lardan",
+        "min", "mun", "miz", "muz", "yken", "gil", "gile", "gilde", "cige", "cigi", "cigin",
+        // Ek-fiil ve -ki: "Mehmettir", "Mehmetti", "Ayşeydim", "Ayşeninki", "Kayadaki", "Tekinlerdeyiz".
+        "di", "du", "ti", "tu", "tir", "tur", "dim", "dum", "tim", "tum", "ydim", "ydum", "si", "su",
+        "ki", "ninki", "nunki", "deki", "daki", "teki", "taki", "lerde", "larda", "lerdeyiz", "lardayiz",
     };
+
+    // Ünsüz yumuşaması (katlanmış): "Mehmet" → "Mehmed'in", "Tarık" → "Tarığa" (ç→c katlanınca zaten aynı).
+    private static readonly Dictionary<char, char> Yumusama = new() { ['t'] = 'd', ['k'] = 'g', ['p'] = 'b' };
 
     private const int EkSiniri = 6;
 
     [GeneratedRegex(@"[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+", RegexOptions.CultureInvariant)]
     private static partial Regex EpostaDeseni();
 
-    [GeneratedRegex(@"(?<!\d)[1-9]\d{10}(?!\d)", RegexOptions.CultureInvariant)]
+    // 11 hane; araya boşluk, nokta, tire girebilir ("100 000 001 46"). Sağlama ayırıcılar atılarak yapılır.
+    [GeneratedRegex(@"(?<!\d)[1-9](?:[\s.-]?\d){10}(?!\d)", RegexOptions.CultureInvariant)]
     private static partial Regex TcAdayi();
 
-    // +90 532 123 45 67 · 0532 123 45 67 · 0 532-123-45-67 · (532) 123 45 67 · 5321234567
-    [GeneratedRegex(@"(?<![\d+])(?:\+90[\s-]?|90[\s-]?|0[\s-]?)?\(?5\d{2}\)?[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}(?!\d)",
+    // +90 532 123 45 67 · 0532 123 45 67 · 0 532-123-45-67 · 0532.123.45.67 · (532) 123 45 67 · 5321234567
+    // Sabit hat yalnızca başında 0 / +90 ile: 0212 555 44 33.
+    [GeneratedRegex(@"(?<![\d+])(?:(?:\+90[\s.-]?|90[\s.-]?|0[\s.-]?)?\(?5\d{2}\)?|(?:\+90[\s.-]?|0[\s.-]?)\(?[2-4]\d{2}\)?)[\s.-]?\d{3}[\s.-]?\d{2}[\s.-]?\d{2}(?!\d)",
         RegexOptions.CultureInvariant)]
     private static partial Regex TelefonDeseni();
 
+    // Görünmez biçim karakterleri (sıfır genişlikli boşluk, yumuşak tire, ZWJ) adı bölmesin.
+    [GeneratedRegex(@"\p{Cf}", RegexOptions.CultureInvariant)]
+    private static partial Regex BicimKarakteri();
+
     // Harf dizisi; içinde tek bir kesme işareti olabilir ("Ayşe'nin", "Kaya’ya"). Kesme kümesi TurkceMetin.KesmeMi ile aynı.
-    [GeneratedRegex(@"\p{L}+(?:['’‘`´]\p{L}+)?", RegexOptions.CultureInvariant)]
+    // Birleşik işaretler (\p{M}) sözcüğü bölmesin; karşılaştırmadan önce atılır.
+    [GeneratedRegex(@"[\p{L}\p{M}]+(?:['’‘`´][\p{L}\p{M}]+)?", RegexOptions.CultureInvariant)]
     private static partial Regex Sozcuk();
+
+    [GeneratedRegex(@"\p{Mn}", RegexOptions.CultureInvariant)]
+    private static partial Regex BirlesikIsaret();
 
     public static string Maskele(string metin, string? ad = null, string? soyad = null)
     {
         if (string.IsNullOrEmpty(metin)) return metin;
-        // Ayrıştırılmış (NFD) yapıştırılan "Ayşe" (s + birleşik çengel) sözcük ortasından bölünmesin.
-        metin = metin.Normalize(NormalizationForm.FormC);
+        // Önce biçim karakterleri silinir, sonra NFC: "s + ZWJ + birleşik çengel" de "ş" olsun.
+        metin = BicimKarakteri().Replace(metin, "").Normalize(NormalizationForm.FormC);
 
         var sonuc = EpostaDeseni().Replace(metin, Eposta);
-        sonuc = TcAdayi().Replace(sonuc, m => TcKimlik.GecerliMi(m.Value) ? Tc : m.Value);
+        sonuc = TcAdayi().Replace(sonuc, m => TcKimlik.GecerliMi(Rakamlar(m.Value)) ? Tc : m.Value);
         sonuc = TelefonDeseni().Replace(sonuc, Telefon);
 
         var adlar = Parcalar(ad);
@@ -67,10 +84,21 @@ public static partial class Maskeleyici
         });
     }
 
+    private static string Rakamlar(string s) => string.Concat(s.Where(char.IsAsciiDigit));
+
     private static List<string> Parcalar(string? isim) =>
         string.IsNullOrWhiteSpace(isim)
             ? []
-            : isim.Split([' ', '-'], StringSplitOptions.RemoveEmptyEntries).Select(TurkceMetin.Katla).Where(p => p.Length > 1).ToList();
+            : isim.Split([' ', '-'], StringSplitOptions.RemoveEmptyEntries).Select(TurkceMetin.Katla).Where(p => p.Length > 1)
+                .SelectMany(Govdeler).Distinct().ToList();
+
+    private static IEnumerable<string> Govdeler(string isim)
+    {
+        yield return isim;
+        if (Yumusama.TryGetValue(isim[^1], out var yumusak)) yield return isim[..^1] + yumusak;
+    }
+
+    private static string Sade(string s) => TurkceMetin.Katla(BirlesikIsaret().Replace(s, ""));
 
     /// <summary>Büyük/küçük harf ve Türkçe karakterden bağımsız (katlanmış) karşılaştırma; ek kesmeli ya da listeden.</summary>
     private static bool Eslesir(string sozcuk, List<string> isimler)
@@ -81,12 +109,12 @@ public static partial class Maskeleyici
         if (kesme >= 0)
         {
             // Kesme özel adın ekini ayırır: ekin ne olduğu önemli değil, uzunluğu sınırlı.
-            var govde = TurkceMetin.Katla(sozcuk[..kesme]);
+            var govde = Sade(sozcuk[..kesme]);
             var ek = sozcuk.Length - kesme - 1;
             return ek <= EkSiniri && isimler.Contains(govde, StringComparer.Ordinal);
         }
 
-        var katli = TurkceMetin.Katla(sozcuk);
+        var katli = Sade(sozcuk);
         foreach (var isim in isimler)
         {
             if (!katli.StartsWith(isim, StringComparison.Ordinal)) continue;

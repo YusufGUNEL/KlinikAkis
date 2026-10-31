@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -60,31 +61,75 @@ public sealed class FakeChatClient : IChatClient
 
     private static string HazirYanit(string metin)
     {
-        var k = TurkceMetin.Katla(metin);
-        bool Var(params string[] kokler) => kokler.Any(kok => TurkceMetin.KokVar(k, kok));
+        // "N. soru → cevap" satırları: belirti yalnızca hastanın cevabında geçiyorsa ve o adıma bağlı yazılır.
+        var cevaplar = new List<(int Adim, string Ham, string Katli)>();
+        foreach (var satir in metin.Split('\n'))
+        {
+            var nokta = satir.IndexOf(". ", StringComparison.Ordinal);
+            var ok = satir.IndexOf(" → ", StringComparison.Ordinal);
+            if (nokta <= 0 || ok < nokta || !int.TryParse(satir[..nokta], CultureInfo.InvariantCulture, out var adim)) continue;
+            var ham = satir[(ok + 3)..];
+            cevaplar.Add((adim, ham, TurkceMetin.Katla(ham)));
+        }
+        int? Adim(params string[] kokler) =>
+            cevaplar.Where(c => kokler.Any(kok => TurkceMetin.KokVar(c.Katli, kok))).Select(c => (int?)c.Adim).FirstOrDefault();
+        bool Var(params string[] kokler) => Adim(kokler) is not null;
 
-        object yanit = Var("su ic", "idrar", "susa")
-            ? Ozet("Birkaç haftadır çok su içme, sık idrara çıkma ve halsizlik.", ["Çok su içme", "Sık idrar", "Halsizlik"],
-                BransKodu.Endokrinoloji, BransKodu.Dahiliye, "Susama ve sık idrar, bilinen diyabet takibiyle uyumlu.")
-            : Var("bogaz", "kulak")
-                ? Ozet("Boğaz ağrısı ve ateş.", ["Boğaz ağrısı", "Ateş"],
-                    BransKodu.Kbb, BransKodu.Dahiliye, "Boğaz ağrısı ve ateş kulak burun boğaz muayenesi gerektirir.")
-                : Ozet("Genel şikayet; ayrıntı sohbette.", ["Genel şikayet"],
-                    BransKodu.Dahiliye, null, "Belirgin bir bölüm işareti yok; genel değerlendirme.");
+        (string Madde, string[] Kokler)[] adaylar;
+        BransKodu oneri;
+        BransKodu? alternatif;
+        string gerekce;
+        if (Var("su ic", "idrar", "susa"))
+        {
+            adaylar = [("Çok su içme", ["su ic", "susa"]), ("Sık idrara çıkma", ["idrar"]), ("Halsizlik", ["halsiz", "yorgun"])];
+            (oneri, alternatif, gerekce) = (BransKodu.Endokrinoloji, BransKodu.Dahiliye,
+                "Çok su içme ve sık idrara çıkma endokrinoloji bölümünde değerlendirilir.");
+        }
+        else if (Var("kulak", "kulag"))
+        {
+            adaylar = [("Kulak ağrısı", ["kulak", "kulag"]), ("Ateş", ["ates", "38"])];
+            // İstemdeki "çocuk: evet/hayır" satırını kod yazar; Fake de ona uyar (yetişkine Çocuk Sağlığı reddedilir).
+            (oneri, alternatif, gerekce) = metin.Contains("çocuk: evet", StringComparison.Ordinal)
+                ? (BransKodu.CocukSagligi, BransKodu.Kbb, "Çocuk hastada kulak ağrısı; önce Çocuk Sağlığı değerlendirmesi.")
+                : (BransKodu.Kbb, (BransKodu?)BransKodu.Dahiliye, "Kulak ağrısı kulak burun boğaz muayenesi gerektirir.");
+        }
+        else if (Var("bogaz"))
+        {
+            adaylar = [("Boğaz ağrısı", ["bogaz"]), ("Yutkunma güçlüğü", ["yutkun"]), ("Ateş", ["ates", "38"])];
+            (oneri, alternatif, gerekce) = (BransKodu.Kbb, BransKodu.Dahiliye,
+                "Boğaz ağrısı kulak burun boğaz muayenesi gerektirir.");
+        }
+        else if (Var("kilo al", "usu"))
+        {
+            adaylar = [("Kilo alma", ["kilo al"]), ("Üşüme", ["usu"])];
+            (oneri, alternatif, gerekce) = (BransKodu.Endokrinoloji, BransKodu.Dahiliye,
+                "Kilo alma ve üşüme endokrinoloji bölümünde değerlendirilir.");
+        }
+        else
+        {
+            adaylar = [];
+            (oneri, alternatif, gerekce) = (BransKodu.Dahiliye, null, "Belirgin bir bölüm işareti yok; genel değerlendirme.");
+        }
+
+        var maddeler = adaylar.Select(a => (a.Madde, Adim: Adim(a.Kokler))).Where(m => m.Adim is not null).ToList();
+        if (maddeler.Count == 0 && cevaplar.Count > 0) maddeler.Add(("Genel şikayet", cevaplar[0].Adim));
+        var sure = cevaplar.FirstOrDefault(c => c.Adim == 2).Ham;
+
+        // Harf büyütüp küçültme yok (kültürsüz ToLower "İ/ı"yı bozar): maddeler olduğu gibi sıralanır.
+        var ozet = maddeler.Count == 0 ? "Genel şikayet." : "Şikayetler: " + string.Join(", ", maddeler.Select(m => m.Madde)) + ".";
+        object yanit = new
+        {
+            ozet,
+            semptomlar = maddeler.Select(m => m.Madde).ToArray(),
+            sure = string.IsNullOrWhiteSpace(sure) ? "Belirtilmedi" : sure,
+            siddet = "Orta",
+            onerilenBrans = oneri.ToString(),
+            alternatifBrans = alternatif?.ToString(),
+            gerekce,
+            aciliyet = "Rutin",
+            doktoraSorular = new[] { "Şikayet ne zaman başladı, giderek artıyor mu?" },
+            kaynaklar = maddeler.Select(m => new { madde = m.Madde, sohbetAdimi = m.Adim }).ToArray(),
+        };
         return JsonSerializer.Serialize(yanit, Json);
     }
-
-    private static object Ozet(string ozet, string[] semptomlar, BransKodu oneri, BransKodu? alternatif, string gerekce) => new
-    {
-        ozet,
-        semptomlar,
-        sure = "Sohbette belirtildi",
-        siddet = "Orta",
-        onerilenBrans = oneri.ToString(),
-        alternatifBrans = alternatif?.ToString(),
-        gerekce,
-        aciliyet = "Rutin",
-        doktoraSorular = Array.Empty<string>(),
-        kaynaklar = new[] { new { madde = semptomlar[0], sohbetAdimi = 1 } },
-    };
 }

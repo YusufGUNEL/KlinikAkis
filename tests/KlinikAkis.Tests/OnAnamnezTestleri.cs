@@ -21,7 +21,7 @@ public sealed class OnAnamnezTestleri(KlinikApiFabrikasi fabrika) : IClassFixtur
         await using var kapsam = fabrika.Services.CreateAsyncScope();
         var db = kapsam.ServiceProvider.GetRequiredService<KlinikDbContext>();
         var sahte = new FakeChatClient { Gecikme = TimeSpan.Zero };
-        var hatti = new AiHatti(sahte, db, kapsam.ServiceProvider.GetRequiredService<TimeProvider>());
+        var hatti = AiHattiTestleri.Hatti(kapsam.ServiceProvider, sahte);
         var hasan = await db.Hastalar.AsNoTracking().FirstAsync(h => h.Id == SenaryoIdleri.Hasan);
         var oncekiKayit = await db.AiAuditLoglari.CountAsync();
 
@@ -44,18 +44,19 @@ public sealed class OnAnamnezTestleri(KlinikApiFabrikasi fabrika) : IClassFixtur
         var db = kapsam.ServiceProvider.GetRequiredService<KlinikDbContext>();
         string? gorulen = null;
         var sahte = new FakeChatClient { Gecikme = TimeSpan.Zero, Yanitla = m => { gorulen = m; return "{}"; } };
-        var hatti = new AiHatti(sahte, db, kapsam.ServiceProvider.GetRequiredService<TimeProvider>());
+        var hatti = AiHattiTestleri.Hatti(kapsam.ServiceProvider, sahte);
         var ayse = await db.Hastalar.AsNoTracking().FirstAsync(h => h.Id == SenaryoIdleri.Ayse);
 
         var sonuc = await hatti.OnAnamnezOzetiAsync(ayse,
             [new SohbetKaydi(6, "Ek", [], $"Ayşe'nin telefonu 0532 123 45 67, TC {ayse.TcKimlik}")], default);
 
         Assert.Equal(1, sahte.CagriSayisi);
-        Assert.Equal(AiKaynak.Llm, sonuc.Kaynak);
+        // "{}" şemaya uymaz → sunucu doğrulaması yedeğe düşürür; burada önemli olan modelin gördüğü metin.
+        Assert.Equal(AiKaynak.Yedek, sonuc.Kaynak);
         Assert.NotNull(gorulen);
         Assert.Contains("[AD] telefonu [TELEFON], TC [TC]", gorulen);
         Assert.Contains("<hasta_metni>", gorulen);
-        Assert.Contains($"hasta: {ayse.TakmaAd} · yaş: 50-59 · K", gorulen);
+        Assert.Contains($"hasta: {ayse.TakmaAd} · yaş: 50-59 · cinsiyet: kadın · çocuk: hayır", gorulen, StringComparison.Ordinal);
         Assert.DoesNotContain("Ayşe", gorulen);
         Assert.DoesNotContain(ayse.TcKimlik, gorulen);
     }
@@ -67,7 +68,7 @@ public sealed class OnAnamnezTestleri(KlinikApiFabrikasi fabrika) : IClassFixtur
         var db = kapsam.ServiceProvider.GetRequiredService<KlinikDbContext>();
         string? gorulen = null;
         var sahte = new FakeChatClient { Gecikme = TimeSpan.Zero, Yanitla = m => { gorulen = m; return "{}"; } };
-        var hatti = new AiHatti(sahte, db, kapsam.ServiceProvider.GetRequiredService<TimeProvider>());
+        var hatti = AiHattiTestleri.Hatti(kapsam.ServiceProvider, sahte);
         var mehmet = await db.Hastalar.AsNoTracking().FirstAsync(h => h.Id == SenaryoIdleri.Mehmet);
 
         await hatti.OnAnamnezOzetiAsync(mehmet,
@@ -99,6 +100,14 @@ public sealed class OnAnamnezTestleri(KlinikApiFabrikasi fabrika) : IClassFixtur
         var ozet = await Json(await hasta.PostAsync($"/api/onanamnez/{id}/ozet", null));
         Assert.Equal("Taslak", ozet.GetProperty("durum").GetString());
         Assert.Equal("Llm", ozet.GetProperty("kaynak").GetString());
+        var kart = ozet.GetProperty("kart");
+        Assert.Equal("Endokrinoloji", kart.GetProperty("onerilen").GetProperty("kod").GetString());
+        Assert.Equal("Dahiliye", kart.GetProperty("alternatif").GetProperty("kod").GetString());
+        // Hastaya modelin serbest metni gitmez: kendi cevapları + bölüm.
+        Assert.False(kart.TryGetProperty("model", out _));
+        Assert.False(kart.TryGetProperty("taslak", out _));
+        Assert.Contains(kart.GetProperty("cevaplar").EnumerateArray(), c => c.GetProperty("adim").GetInt32() == 1);
+        Assert.False(kart.GetProperty("kotaDoldu").GetBoolean());
 
         // Model denetim kaydında maskeli metni görür (doktorun "modele giden veri" ucu).
         var doktor = await fabrika.GirisYapAsync("doktor", SenaryoIdleri.HekimEndokrinoloji);

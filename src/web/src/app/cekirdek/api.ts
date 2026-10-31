@@ -98,6 +98,8 @@ export interface RandevuSatiri {
   acikRizaAlindi: boolean;
   takipNo: string | null;
   izinliEylemler: RandevuEylemi[];
+  /** Şikayet sohbetiyle alındıysa ön anamnez kartı (yoksa null). */
+  onAnamnezId: string | null;
 }
 
 /** SignalR olayı: yalnızca {tur, id}; istemci ilgili REST'i yeniden çeker (SPEC §8). */
@@ -140,4 +142,121 @@ export interface OzetYaniti {
   durum: OnAnamnezDurumu;
   kaynak: AiKaynak | null;
   kirmiziBayrak: KirmiziBayrak | null;
+  kart: HastaOzetKarti | null;
+}
+
+export interface HastaCevabi {
+  adim: number;
+  soru: string;
+  cevap: string;
+}
+
+/** Hastanın gördüğü özet (taslak 2): kendi cevapları + kodda doğrulanmış bölüm; modelin serbest metni yok. */
+export interface HastaOzetKarti {
+  id: string;
+  durum: OnAnamnezDurumu;
+  kaynak: AiKaynak;
+  zaman: string;
+  kotaDoldu: boolean;
+  cevaplar: HastaCevabi[];
+  onerilen: BolumOnerisi;
+  alternatif: BolumOnerisi | null;
+}
+
+export type Siddet = 'Hafif' | 'Orta' | 'Siddetli';
+export type Aciliyet = 'Rutin' | 'Oncelikli';
+
+/** Kaynak maddesi; sohbetAdimi 0 = "kaynak yok" (sunucu doğrulaması aralık dışını işaretler). */
+export interface KaynakMaddesi {
+  madde: string;
+  sohbetAdimi: number;
+}
+
+/** §9.5 çıktı şeması (sunucuda doğrulanmış). Bölüm kararı listeden; kodla doğrulanır. */
+export interface OnAnamnezTaslagi {
+  ozet: string;
+  semptomlar: string[];
+  sure: string;
+  siddet: Siddet;
+  onerilenBrans: string;
+  alternatifBrans: string | null;
+  gerekce: string;
+  aciliyet: Aciliyet;
+  doktoraSorular: string[];
+  kaynaklar: KaynakMaddesi[];
+}
+
+export interface BolumOnerisi {
+  bransId: string;
+  kod: string;
+  ad: string;
+}
+
+export interface OnAnamnezKarti {
+  id: string;
+  durum: OnAnamnezDurumu;
+  kaynak: AiKaynak;
+  model: string | null;
+  /** Taslağın üretildiği an (UTC ISO). */
+  zaman: string;
+  /** Kota doldu: model çağrılmadı, taslak kural tabanlı; kartta rozet (SPEC §9.9). */
+  kotaDoldu: boolean;
+  taslak: OnAnamnezTaslagi;
+  onerilen: BolumOnerisi;
+  alternatif: BolumOnerisi | null;
+}
+
+export interface SohbetKaydi {
+  adim: number;
+  soru: string;
+  secimler: string[];
+  metin: string | null;
+  cevap: string;
+}
+
+export interface HekimKarari {
+  durum: OnAnamnezDurumu;
+  hekimAd: string;
+  zaman: string;
+  duzeltme: string | null;
+}
+
+export interface OnAnamnezDetayi {
+  id: string;
+  hastaId: string;
+  durum: OnAnamnezDurumu;
+  kirmiziBayrakKurali: string | null;
+  kart: OnAnamnezKarti | null;
+  sohbet: SohbetKaydi[];
+  hastaOnayi: boolean;
+  hastaNotu: string | null;
+  karar: HekimKarari | null;
+}
+
+export type HekimKararTuru = 'onayla' | 'duzenle' | 'reddet';
+
+/** "Modele giden veri" satırı (AiAuditLog). */
+export interface DenetimSatiri {
+  id: string;
+  zaman: string;
+  ozellik: string;
+  hastaId: string | null;
+  saglayici: string;
+  model: string;
+  istemSurumu: string;
+  maskeliGirdi: string;
+  girdiHash: string;
+  ciktiJson: string | null;
+  gecikmeMs: number;
+  basarili: boolean;
+  yedegeDustu: boolean;
+  neden: string | null;
+}
+
+export interface ErisimSatiri {
+  id: string;
+  zaman: string;
+  kullaniciRol: string;
+  kullaniciAd: string;
+  eylem: string;
 }

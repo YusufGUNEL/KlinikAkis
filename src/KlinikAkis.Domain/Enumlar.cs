@@ -28,3 +28,8 @@ public enum PaketTipi { HastaKayit = 101, Muayene = 103, LabSonuc = 105 }
 public enum OutboxDurumu { Bekliyor, Gonderildi, IsKuraliHatasi }
 
 public enum AiOzellik { OnAnamnez, TahlilAciklama, Epikriz }
+
+/// <summary>Ön anamnez şiddeti (SPEC §9.5); LLM şemasında enum.</summary>
+public enum Siddet { Hafif, Orta, Siddetli }
+
+public enum Aciliyet { Rutin, Oncelikli }

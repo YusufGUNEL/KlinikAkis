@@ -34,7 +34,7 @@ export function hataMesaji(hata: unknown): string {
     // ValidationProblem: Türkçe mesaj alan sözlüğünde (title İngilizce, detail boş).
     const ilk = Object.values(govde?.errors ?? {}).flat()[0];
     if (typeof ilk === 'string' && ilk) return ilk;
-    if (hata.status === 401 || hata.status === 403) return 'Bu işlem için yetkiniz yok ya da oturumun süresi doldu.';
+    if (hata.status === 401 || hata.status === 403) return 'Bu işlem için yetkiniz yok ya da oturumunuzun süresi doldu.';
   }
   return 'İşlem yapılamadı. Bağlantıyı kontrol edip yeniden deneyin.';
 }

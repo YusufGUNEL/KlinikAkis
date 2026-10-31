@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json.Serialization;
 using System.Text.Unicode;
+using System.Threading.RateLimiting;
 using KlinikAkis.Api.Endpointler;
 using KlinikAkis.Api.Gercekzaman;
 using KlinikAkis.Api.Kimlik;
@@ -112,12 +113,25 @@ builder.Services.AddSignalR()
     .AddJsonProtocol(o => o.PayloadSerializerOptions.Encoder = JavaScriptEncoder.Create(UnicodeRanges.All));
 builder.Services.AddSingleton<IOlayYayinci, OlayYayinci>();
 // Her LLM çağrısı tek AiHatti üzerinden (SPEC §9.1). AI:Provider yoksa Fake: demo ağsız ve ücretsiz çalışır.
-builder.Services.AddKlinikAi();
+var aiAyar = builder.Services.AddKlinikAi(builder.Configuration);
+// LLM uçları herkese açık URL'de: IP başına dakikada 10 istek, aşımda 429 ProblemDetails (SPEC §9.9).
+var dakikadaIstek = builder.Configuration.GetValue("AI:DakikadaIstek", 10);
+builder.Services.AddRateLimiter(o =>
+{
+    o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    o.AddPolicy(AiHizSiniri.Politika, baglam => RateLimitPartition.GetFixedWindowLimiter(
+        baglam.Connection.RemoteIpAddress?.ToString() ?? "bilinmiyor",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = dakikadaIstek, Window = TimeSpan.FromMinutes(1) }));
+    o.OnRejected = (baglam, ct) => new ValueTask(TypedResults.Problem(
+            detail: "Çok fazla istek gönderildi; bir dakika sonra yeniden deneyin.", statusCode: StatusCodes.Status429TooManyRequests)
+        .ExecuteAsync(baglam.HttpContext));
+});
 
 var app = builder.Build();
 
-if (!AiKurulumu.Destekleniyor(app.Configuration["AI:Provider"]))
-    app.Logger.LogWarning("AI:Provider '{Saglayici}' henüz desteklenmiyor; Fake sağlayıcı kullanılıyor.", app.Configuration["AI:Provider"]);
+if (aiAyar.Uyari is { } aiUyarisi)
+    app.Logger.LogWarning("{Uyari}", aiUyarisi);
+app.Logger.LogInformation("AI sağlayıcı: {Saglayici} · model: {Model} · günlük limit: {Limit}", aiAyar.Saglayici, aiAyar.Model, aiAyar.GunlukLimit);
 if (geciciAnahtar)
     app.Logger.LogWarning("Jwt:Key tanımlı değil; geçici anahtar üretildi. Kalıcı anahtar için: dotnet user-secrets set \"Jwt:Key\" <en az 32 karakter>");
 
@@ -137,6 +151,7 @@ if (arayuzVar)
 }
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 if (app.Environment.IsDevelopment())
 {

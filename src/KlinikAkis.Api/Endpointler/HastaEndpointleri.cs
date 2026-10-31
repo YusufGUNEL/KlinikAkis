@@ -21,8 +21,17 @@ public static class HastaEndpointleri
         hastalar.MapGet("/tahliller", Tahliller).WithName("HastaTahlilleri").ProducesProblem(StatusCodes.Status404NotFound)
             .WithSummary("Teste göre gruplu sonuçlar: hastanın cinsiyetine göre referans, son değer, kodla verilen işaret, trend");
 
+        hastalar.MapGet("/erisim", Erisim).WithName("HastaErisimKaydi")
+            .WithSummary("Bu hastanın verisine kim, ne zaman, ne yaptı (yeniden eskiye, son 50)");
+
         return api;
     }
+
+    private static async Task<Ok<List<ErisimSatiri>>> Erisim(Guid id, KlinikDbContext db, CancellationToken ct) =>
+        TypedResults.Ok(await db.ErisimKayitlari.AsNoTracking().Where(e => e.HastaId == id)
+            .OrderByDescending(e => e.Zaman).Take(50)
+            .Select(e => new ErisimSatiri(e.Id, e.Zaman, e.KullaniciRol, e.KullaniciAd, e.Eylem))
+            .ToListAsync(ct));
 
     private static async Task<Results<Ok<HastaOzeti>, ProblemHttpResult>> Ozet(
         Guid id, ClaimsPrincipal kullanici, KlinikDbContext db, TimeProvider zaman, CancellationToken ct)
@@ -38,7 +47,7 @@ public static class HastaEndpointleri
             KullaniciRol = kullanici.FindFirstValue(DemoClaim.Rol) ?? "",
             KullaniciAd = kullanici.FindFirstValue(DemoClaim.Ad) ?? "",
             HastaId = id,
-            Eylem = "Görüntüledi",
+            Eylem = "Hasta kaydını görüntüledi",
         });
         await db.SaveChangesAsync(ct);
 
@@ -81,6 +90,8 @@ public static class HastaEndpointleri
     /// <summary>"99*******78": ilk 2 ve son 2 hane görünür.</summary>
     private static string TcMaskele(string tc) => tc.Length == 11 ? tc[..2] + new string('*', 7) + tc[^2..] : "***";
 }
+
+public sealed record ErisimSatiri(Guid Id, DateTime Zaman, string KullaniciRol, string KullaniciAd, string Eylem);
 
 public sealed record HastaOzeti(
     Guid Id, string Ad, string Soyad, int Yas, Cinsiyet Cinsiyet, string TcMaskeli, string TakmaAd,
