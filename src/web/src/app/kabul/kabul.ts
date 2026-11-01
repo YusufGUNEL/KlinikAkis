@@ -10,6 +10,7 @@ import { BaglantiGostergesi } from '../ortak/baglanti-gostergesi';
 import { DurumKutusu } from '../ortak/durum-kutusu';
 import { DurumRozeti } from '../ortak/durum-rozeti';
 import { GonderimKutusu } from '../ortak/gonderim-kutusu';
+import { IkiAdimliOnay } from '../ortak/iki-adimli-onay';
 import { simdiSinyali } from '../ortak/simdi';
 import { UstCubuk } from '../ortak/ust-cubuk';
 
@@ -46,9 +47,10 @@ const DURUM_ADI: Record<RandevuDurumu, string> = {
             @if (mesaj()) {
               <span class="text-slate-700" role="status">{{ mesaj() }}</span>
             }
-            <button pButton type="button" severity="secondary" variant="outlined" class="text-slate-700" [disabled]="sifirlaniyor()" (click)="sifirla()">
-              {{ sifirlaniyor() ? 'Sıfırlanıyor…' : 'Demo sıfırla' }}
+            <button pButton type="button" severity="secondary" variant="outlined" class="ikincil min-h-12" [class.onay-bekliyor]="sifirlaOnayi.bekliyor()" [disabled]="sifirlaniyor()" (click)="sifirla()">
+              {{ sifirlaniyor() ? 'Sıfırlanıyor…' : sifirlaOnayi.bekliyor() ? 'Emin misiniz? Sıfırla' : 'Demo verisini sıfırla' }}
             </button>
+            <span class="sr-only" aria-live="polite">{{ sifirlaOnayi.bekliyor() ? sifirlaOnayi.duyuru : '' }}</span>
           </span>
         </div>
 
@@ -96,6 +98,7 @@ const DURUM_ADI: Record<RandevuDurumu, string> = {
                             size="small"
                             [severity]="e === 'Kabul' ? 'primary' : 'secondary'"
                             [variant]="e === 'Kabul' ? undefined : 'outlined'"
+                            [class.ikincil]="e !== 'Kabul'"
                             [disabled]="islemdekiler().has(r.id)"
                             [attr.aria-label]="r.siraNo + ' ' + r.hastaAd + ': ' + etiketler[e]"
                             (click)="uygula(r, e)"
@@ -131,6 +134,7 @@ export class Kabul {
   protected readonly kabulEylemleri = KABUL_EYLEMLERI;
   protected readonly etiketler = EYLEM_ETIKETI;
   protected readonly sifirlaniyor = signal(false);
+  protected readonly sifirlaOnayi = new IkiAdimliOnay();
   protected readonly mesaj = signal('');
   protected readonly hata = signal('');
   /** Satır başına: bir satırın işlemi bitince başka satırın butonları erken açılmasın. */
@@ -181,6 +185,8 @@ export class Kabul {
   }
 
   protected async sifirla(): Promise<void> {
+    // İşlem düğmelerine yakın: yanlış tıklama hazırlanmış demo durumunu silmesin.
+    if (!this.sifirlaOnayi.onaylandi()) return;
     this.sifirlaniyor.set(true);
     try {
       await this.demo.sifirla();

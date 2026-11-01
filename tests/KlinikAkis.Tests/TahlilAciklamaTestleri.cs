@@ -118,6 +118,8 @@ public sealed class TahlilAciklamaTestleri(KlinikApiFabrikasi fabrika) : IClassF
     [InlineData("Sonucunuz 7.4, önceki 6,6.", true)]
     [InlineData("Sonucunuz 8,1 %.", false)]
     [InlineData("Son 12 ayda artıyor.", false)]
+    [InlineData("Sonucunuz 250mg/dL civarında.", false)]   // birime bitişik uydurma sayı da yakalanır
+    [InlineData("Sonucunuz 7,4% ile aralığın üstünde.", true)]
     public void Metindeki_sayilar_girdide_olmali(string metin, bool gecerli) =>
         Assert.Equal(gecerli, TahlilAciklamaDogrulayici.SayilarGirdide(metin, AyseHba1c));
 

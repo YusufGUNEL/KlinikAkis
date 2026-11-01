@@ -48,7 +48,7 @@ import { simdiSinyali } from '../ortak/simdi';
               <p class="mt-1 text-[17px] text-slate-700">Sıra no: <span class="font-semibold tabular-nums">{{ r.siraNo }}</span></p>
             </article>
           } @empty {
-            <app-durum-kutusu tur="bos" mesaj="Henüz randevunuz yok." />
+            <app-durum-kutusu tur="bos" mesaj="Yaklaşan randevunuz yok." />
           }
         } @else {
           <app-durum-kutusu tur="yukleniyor" />

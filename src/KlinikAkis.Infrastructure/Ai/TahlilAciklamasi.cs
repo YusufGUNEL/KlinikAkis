@@ -132,11 +132,14 @@ public static partial class TahlilAciklamaDogrulayici
     public static bool SayilarIzinli(string metin, IReadOnlyCollection<decimal> izinli) =>
         Sayilar(metin).All(d => izinli.Contains(d) || (d is >= 1 and <= 3 && d == decimal.Truncate(d)));
 
-    /// <summary>Metindeki sayılar (ondalık virgül ya da nokta); harfe bitişik rakamlar ("HbA1c") sayı sayılmaz.</summary>
+    /// <summary>
+    /// Metindeki sayılar (ondalık virgül ya da nokta); önünde harf olan rakamlar ("HbA1c") sayı sayılmaz.
+    /// Arkasında harf olabilir: birime bitişik "250mg/dL" de sayıdır (epikriz doğrulayıcısıyla aynı kural).
+    /// </summary>
     public static IEnumerable<decimal> Sayilar(string metin) =>
         SayiDeseni().Matches(metin).Select(m => decimal.Parse(m.Value.Replace(',', '.'), CultureInfo.InvariantCulture));
 
-    [GeneratedRegex(@"(?<![\p{L}\d,.])\d+(?:[,.]\d+)?(?![\p{L}\d])")]
+    [GeneratedRegex(@"(?<![\p{L}\d,.])\d+(?:[,.]\d+)?(?!\d)")]
     private static partial Regex SayiDeseni();
 
     /// <summary>Yüksekte "düşük"/"normal", düşükte "yüksek"/"normal aralıkta", normalde "yüksek"/"düşük" geçemez.</summary>

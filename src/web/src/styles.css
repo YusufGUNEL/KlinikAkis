@@ -49,3 +49,10 @@ body {
   color: var(--color-slate-800);
   border-color: var(--color-slate-500);
 }
+
+/* İki adımlı onay bekliyor: amber kenar (kırmızı değil; kırmızı yalnız alerji/kritik/kırmızı bayrak). */
+.p-button.p-button-outlined.ikincil.onay-bekliyor {
+  color: var(--color-uyari);
+  border-color: var(--color-uyari);
+  border-width: 2px;
+}

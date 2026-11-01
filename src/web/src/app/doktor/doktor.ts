@@ -195,7 +195,9 @@ const OZELLIK_ADI: Record<string, string> = {
               </section>
             }
           } @else {
-            <div class="p-4"><app-durum-kutusu tur="bos" mesaj="Listeden bir hasta seçin." /></div>
+            <div class="p-4">
+              <app-durum-kutusu tur="bos" [mesaj]="liste.error() ? 'Liste yüklenince hasta seçebilirsiniz.' : 'Listeden bir hasta seçin.'" />
+            </div>
           }
         </main>
 

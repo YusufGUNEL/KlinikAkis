@@ -92,6 +92,10 @@ public sealed class KlinikDbContext(DbContextOptions<KlinikDbContext> options) :
         {
             e.HasOne<Hasta>().WithMany().HasForeignKey(x => x.HastaId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<Hekim>().WithMany().HasForeignKey(x => x.OnaylayanHekimId).OnDelete(DeleteBehavior.Restrict);
+            // Oku-kontrol-yaz (özet, hasta onayı, hekim kararı, randevuya bağlama) eşzamanlı ikinci yazımı reddeder:
+            // çift dokunma ikinci taslağı yazmaz, bir ön anamnez iki randevuya bağlanmaz (Randevu ile aynı yöntem).
+            e.Property(x => x.Durum).IsConcurrencyToken();
+            e.Property(x => x.RandevuId).IsConcurrencyToken();
             // RandevuId ↔ Randevu.OnAnamnezId döngüsel FK olmasın diye RandevuId yalnızca değer olarak tutulur.
         });
 
@@ -109,6 +113,8 @@ public sealed class KlinikDbContext(DbContextOptions<KlinikDbContext> options) :
             e.HasOne<Hasta>().WithMany().HasForeignKey(x => x.HastaId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.TahlilTanimi).WithMany().HasForeignKey(x => x.TahlilTanimiId).OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => new { x.HastaId, x.TahlilTanimiId, x.Zaman });
+            // Eşzamanlı iki "yayınla" iki 105 paketi ve iki erişim kaydı yazmasın; ikincisi reddedilir.
+            e.Property(x => x.HastayaYayinlandi).IsConcurrencyToken();
         });
 
         model.Entity<Epikriz>(e =>

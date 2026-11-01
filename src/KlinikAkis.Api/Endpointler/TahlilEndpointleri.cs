@@ -67,7 +67,17 @@ public static class TahlilEndpointleri
         sonuc.AiZamani = zaman.GetUtcNow().UtcDateTime;
         sonuc.KotaDoldu = ai.KotaDoldu;
         // Model çağrıldıktan sonra iptal edilmez: denetim kaydı ve taslak kaybolmasın.
-        await db.SaveChangesAsync(CancellationToken.None);
+        try
+        {
+            await db.SaveChangesAsync(CancellationToken.None);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            // Model beklenirken sonuç yayınlandı: yayınlanan metin ezilmez, bu çağrının denetim kaydı yine yazılır.
+            foreach (var giris in ex.Entries) giris.State = EntityState.Detached;
+            await db.SaveChangesAsync(CancellationToken.None);
+            return TypedResults.Problem(detail: "Bu sonuç hastaya yayınlandı; yeni taslak üretilmez.", statusCode: StatusCodes.Status409Conflict);
+        }
         return TypedResults.Ok(SonucAciklamasi.Olustur(sonuc, null));
     }
 
@@ -127,7 +137,16 @@ public static class TahlilEndpointleri
                 (istek.Bilgilendirme == BilgilendirmeSecimi.TelefonlaBilgilendirildi
                     ? "hasta telefonla bilgilendirildi"
                     : "hasta bilgilendirilecek"));
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // HastayaYayinlandi belirteci: aynı sonuç eşzamanlı ikinci kez yayınlanmaz (tek 105 paketi, tek erişim kaydı).
+            return TypedResults.Problem(detail: "Bu sonuç bu arada yayınlandı; liste yenilenince güncel hali görünür.",
+                statusCode: StatusCodes.Status409Conflict);
+        }
 
         await yayinci.YayinlaAsync(OlayTuru.TahlilYayinlandi, hastaId, [Grup.Hasta(hastaId), Grup.Doktor(hekimId)], ct);
         return TypedResults.Ok(new YayinYaniti(sonuclar.Select(s => s.Id).ToList(), simdi));

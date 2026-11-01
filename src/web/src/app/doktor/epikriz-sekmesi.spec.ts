@@ -80,6 +80,20 @@ describe('EpikrizSekmesi', () => {
     expect(el.textContent).not.toContain('Reddet');
   });
 
+  it('onaylı epikrizde doktor notu kilitli', () => {
+    const { el } = kur(
+      muayene(kart({ durum: 'Onaylandi', karar: { durum: 'Onaylandi', hekimAd: 'Uzm. Dr. Selin Arslan', zaman: '2026-10-29T11:32:00Z' } })),
+    );
+    expect((el.querySelector('#hekim-notu') as HTMLTextAreaElement).disabled).toBe(true);
+    expect(el.querySelector('[data-test="not-kilitli"]')!.textContent).toContain('Epikriz onaylandı');
+  });
+
+  it('taslak epikrizde doktor notu açık', () => {
+    const { el } = kur(muayene(kart()));
+    expect((el.querySelector('#hekim-notu') as HTMLTextAreaElement).disabled).toBe(false);
+    expect(el.querySelector('[data-test="not-kilitli"]')).toBeNull();
+  });
+
   it('kapalı vizitte taslak kalsa da karar ve oluştur butonu yok', () => {
     const { el } = kur({ ...muayene(kart()), durum: 'Kapali' });
     expect(el.textContent).not.toContain('Onayla');

@@ -134,6 +134,9 @@ public sealed class EpikrizTestleri(KlinikApiFabrikasi fabrika) : IClassFixture<
 
         Assert.Equal(HttpStatusCode.Conflict,
             (await doktor.PostAsJsonAsync($"/api/epikriz/{id}/karar", new { karar = "onayla" })).StatusCode);
+        // Onaylı epikriz nottan üretildi: not artık değişmez (onaylı metin ve 103 paketi eski notla kalmasın).
+        Assert.Equal(HttpStatusCode.Conflict,
+            (await doktor.PutAsJsonAsync($"/api/muayeneler/{muayeneId}/not", new { metin = "onaydan sonra" })).StatusCode);
         var erisim = await Json(await doktor.GetAsync($"/api/hastalar/{SenaryoIdleri.Zeynep}/erisim"));
         Assert.Equal("Epikrizi düzenleyip onayladı", erisim[0].GetProperty("eylem").GetString());
     }

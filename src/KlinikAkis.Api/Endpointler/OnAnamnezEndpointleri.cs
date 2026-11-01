@@ -96,7 +96,7 @@ public static class OnAnamnezEndpointleri
         var bayrak = hatti.KuralKontrolu(hasta!, sohbet);
         if (bayrak is not null)
             KirmiziBayragaAl(onAnamnez, bayrak);
-        await db.SaveChangesAsync(ct);
+        if (!await KaydetAsync(db, ct)) return Degisti();
 
         var sonraki = bayrak is null && sohbet.Count < SoruAgaci.ToplamAdim ? SoruAgaci.Soru(sohbet.Count + 1) : null;
         return TypedResults.Ok(new CevapYaniti(sonraki, sohbet.Count, SoruAgaci.ToplamAdim, bayrak));
@@ -130,7 +130,17 @@ public static class OnAnamnezEndpointleri
             onAnamnez.KotaDoldu = sonuc.KotaDoldu;
         }
         // Model çağrıldıktan sonra iptal edilmez: denetim kaydı ve taslak kaybolmasın.
-        await db.SaveChangesAsync(CancellationToken.None);
+        try
+        {
+            await db.SaveChangesAsync(CancellationToken.None);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            // Eşzamanlı ikinci özet (çift dokunma): ilk taslak korunur; bu çağrının denetim kaydı yine yazılır.
+            foreach (var giris in ex.Entries) giris.State = EntityState.Detached;
+            await db.SaveChangesAsync(CancellationToken.None);
+            return Degisti();
+        }
         return TypedResults.Ok(new OzetYaniti(onAnamnez.Id, onAnamnez.Durum, onAnamnez.Kaynak, sonuc.KirmiziBayrak,
             HastaKarti(await KartAsync(onAnamnez, db, ct), sohbet)));
     }
@@ -161,7 +171,7 @@ public static class OnAnamnezEndpointleri
 
         onAnamnez.HastaOnayi = istek.Dogru;
         onAnamnez.HastaNotu = not;
-        await db.SaveChangesAsync(ct);
+        if (!await KaydetAsync(db, ct)) return Degisti();
 
         // Randevu alındıktan sonra not eklenirse hekimin kartı yenilensin.
         if (await RandevuHekimiAsync(onAnamnez, db, ct) is { } hekimId)
@@ -225,7 +235,7 @@ public static class OnAnamnezEndpointleri
             HastaId = onAnamnez.HastaId,
             Eylem = k.Eylem,
         });
-        await db.SaveChangesAsync(ct);
+        if (!await KaydetAsync(db, ct)) return Degisti();
 
         List<string> gruplar = [Grup.Hasta(onAnamnez.HastaId), Grup.Doktor(hekimId)];
         if (await RandevuHekimiAsync(onAnamnez, db, ct) is { } randevuHekimi)
@@ -247,6 +257,27 @@ public static class OnAnamnezEndpointleri
             .ToListAsync(ct);
         return TypedResults.Ok(satirlar);
     }
+
+    /// <summary>
+    /// OnAnamnez.Durum ve RandevuId eşzamanlılık belirtecidir: eşzamanlı iki yazımdan (çift dokunma, hasta notu ile
+    /// hekim kararı) ikincisi hiçbir şey yazmadan reddedilir; erişim kaydı da yalnızca gerçekleşen kararda kalır.
+    /// </summary>
+    private static async Task<bool> KaydetAsync(KlinikDbContext db, CancellationToken ct)
+    {
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return true;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return false;
+        }
+    }
+
+    private static ProblemHttpResult Degisti() =>
+        TypedResults.Problem(detail: "Ön anamnez bu arada değişti; sayfa yenilenince güncel hali görünür.",
+            statusCode: StatusCodes.Status409Conflict);
 
     private static async Task<Guid?> RandevuHekimiAsync(OnAnamnez o, KlinikDbContext db, CancellationToken ct) =>
         o.RandevuId is { } r

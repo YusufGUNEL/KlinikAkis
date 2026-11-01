@@ -32,11 +32,72 @@ public sealed class MaskeleyiciTestleri
         Assert.Equal("ara [TELEFON] lütfen", Maskeleyici.Maskele($"ara {telefon} lütfen"));
     }
 
+    // Aşama 9 denetimi: farklı gruplama, eğik çizgi ve çift boşluk ayırıcı.
+    [Theory]
+    [InlineData("0532 12 34 567")]
+    [InlineData("05321 23 45 67")]
+    [InlineData("0532/123/45/67")]
+    [InlineData("0532  123 45 67")]
+    [InlineData("90 532 123 45 67")]
+    [InlineData("0532 - 123 - 45 - 67")]
+    [InlineData("0532_123_45_67")]
+    [InlineData("0532   123 45 67")]
+    [InlineData("0532–123–45–67")]
+    public void Farkli_gruplanmis_telefon_maskelenir(string telefon)
+    {
+        Assert.Equal("ara [TELEFON] lütfen", Maskeleyici.Maskele($"ara {telefon} lütfen"));
+    }
+
     [Fact]
     public void Ayiricili_tc_maskelenir()
     {
         var bosluklu = $"{GecerliTc[..3]} {GecerliTc[3..6]} {GecerliTc[6..9]} {GecerliTc[9..]}";
         Assert.Equal("TC: [TC]", Maskeleyici.Maskele($"TC: {bosluklu}"));
+        var egik = $"{GecerliTc[..3]}/{GecerliTc[3..6]}/{GecerliTc[6..9]}/{GecerliTc[9..]}";
+        Assert.Equal("TC: [TC]", Maskeleyici.Maskele($"TC: {egik}"));
+        var ciftBosluk = $"{GecerliTc[..3]}  {GecerliTc[3..]}";
+        Assert.Equal("TC: [TC]", Maskeleyici.Maskele($"TC: {ciftBosluk}"));
+        var tireli = $"{GecerliTc[..3]} - {GecerliTc[3..6]} - {GecerliTc[6..9]} - {GecerliTc[9..]}";
+        Assert.Equal("TC: [TC]", Maskeleyici.Maskele($"TC: {tireli}"));
+    }
+
+    // SPEC §9.2: doğum tarihi modele gönderilmez; hasta serbest metinde yazsa da maskelenir.
+    [Theory]
+    [InlineData("12.03.1971 doğumluyum", "[TARIH] doğumluyum")]
+    [InlineData("doğum: 12/3/1971", "doğum: [TARIH]")]
+    [InlineData("1971-03-12 doğumlu", "[TARIH] doğumlu")]
+    [InlineData("12 Mart 1971'de doğdum", "[TARIH]'de doğdum")]
+    [InlineData("3 AĞUSTOS 1985", "[TARIH]")]
+    [InlineData("1 NİSAN 2001", "[TARIH]")]
+    [InlineData("7 kasım 1990", "[TARIH]")]
+    [InlineData("12 subat 1971", "[TARIH]")]
+    [InlineData("12 Mart, 1971", "[TARIH]")]
+    [InlineData("12.03.71 doğumluyum", "[TARIH] doğumluyum")]
+    [InlineData("1971/03/12", "[TARIH]")]
+    [InlineData("1971.03.12", "[TARIH]")]
+    [InlineData("3 agustos 1985", "[TARIH]")]
+    [InlineData("5 eylul 1990", "[TARIH]")]
+    [InlineData("1 EKİM 1980", "[TARIH]")]
+    [InlineData("2 MAYIS 1980", "[TARIH]")]
+    [InlineData("3 aralık 1980", "[TARIH]")]
+    [InlineData("4 ŞUBAT 1980", "[TARIH]")]
+    [InlineData("5 EKİM 1980", "[TARIH]")]
+    public void Tarih_maskelenir(string metin, string beklenen)
+    {
+        Assert.Equal(beklenen, Maskeleyici.Maskele(metin));
+    }
+
+    [Theory]
+    [InlineData("Şekerim 7.4 çıktı")]
+    [InlineData("3 gündür ateşim 38.5")]
+    [InlineData("12 mart'tan beri öksürük")]
+    [InlineData("1-3 gün")]
+    [InlineData("kilo 58/62/65/71/74 kg")]
+    [InlineData("glukoz 5.6 6.1 7.2 8.0 9.1")]
+    [InlineData("nabız 50 60 70 80 90")]
+    public void Olcum_ve_yilsiz_tarih_maskelenmez(string metin)
+    {
+        Assert.Equal(metin, Maskeleyici.Maskele(metin));
     }
 
     // Denetçinin bulduğu kaçaklar: görünmez karakterle bölünmüş ad ve listede olmayan ekler.
@@ -51,6 +112,10 @@ public sealed class MaskeleyiciTestleri
     [InlineData("Ayşedeki", "[AD]")]
     [InlineData("Ayşeydim", "[AD]")]
     [InlineData("Kayadaki", "[SOYAD]")]
+    [InlineData("Ayşesiz geldim", "[AD] geldim")]
+    [InlineData("Kayalarınki", "[SOYAD]")]
+    [InlineData("Kaya'larınki", "[SOYAD]")]
+    [InlineData("Kaya'lardayız", "[SOYAD]")]
     public void Gorunmez_karakter_ve_ek_kacaklari_maskelenir(string metin, string beklenen)
     {
         Assert.Equal(beklenen, Maskeleyici.Maskele(metin, "Ayşe", "Kaya"));

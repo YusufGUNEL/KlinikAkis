@@ -5,7 +5,7 @@ using KlinikAkis.Domain;
 namespace KlinikAkis.Infrastructure.Ai;
 
 /// <summary>
-/// Modele gitmeden önce kimlik verisini maskeler (SPEC §9.2). Sıra: e-posta → TC → telefon → kayıttaki ad/soyad.
+/// Modele gitmeden önce kimlik verisini maskeler (SPEC §9.2). Sıra: e-posta → tarih → TC → telefon → kayıttaki ad/soyad.
 /// Kayıtta olmayan isimler ve adresler maskelenmez (SPEC §14 Sınırlar).
 /// </summary>
 public static partial class Maskeleyici
@@ -15,6 +15,7 @@ public static partial class Maskeleyici
     public const string Eposta = "[EPOSTA]";
     public const string Ad = "[AD]";
     public const string Soyad = "[SOYAD]";
+    public const string Tarih = "[TARIH]";
 
     // Kesmesiz yazılan ekler kapalı listedir (katlanmış biçimde: "nın/nin/nun/nün" → "nin/nun").
     // Serbest "en fazla 6 harf" kabul edilseydi "Ayşegül" de "Ayşe" + "gül" sayılırdı.
@@ -30,6 +31,8 @@ public static partial class Maskeleyici
         // Ek-fiil ve -ki: "Mehmettir", "Mehmetti", "Ayşeydim", "Ayşeninki", "Kayadaki", "Tekinlerdeyiz".
         "di", "du", "ti", "tu", "tir", "tur", "dim", "dum", "tim", "tum", "ydim", "ydum", "si", "su",
         "ki", "ninki", "nunki", "deki", "daki", "teki", "taki", "lerde", "larda", "lerdeyiz", "lardayiz",
+        // Yokluk ve çoğul iyelik -ki: "Ayşesiz", "Kayalarınki".
+        "siz", "suz", "lerinki", "larinki",
     };
 
     // Ünsüz yumuşaması (katlanmış): "Mehmet" → "Mehmed'in", "Tarık" → "Tarığa" (ç→c katlanınca zaten aynı).
@@ -40,13 +43,31 @@ public static partial class Maskeleyici
     [GeneratedRegex(@"[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+", RegexOptions.CultureInvariant)]
     private static partial Regex EpostaDeseni();
 
-    // 11 hane; araya boşluk, nokta, tire girebilir ("100 000 001 46"). Sağlama ayırıcılar atılarak yapılır.
-    [GeneratedRegex(@"(?<!\d)[1-9](?:[\s.-]?\d){10}(?!\d)", RegexOptions.CultureInvariant)]
+    // Doğum tarihi gibi tam tarihler (SPEC §9.2: doğum tarihi gönderilmez): 12.03.1971 · 12/3/1971 · 12-03-1971 ·
+    // 1971-03-12 · 1971/03/12 · 12.03.71. Yıl 19xx/20xx ya da iki hane; "7.4" gibi ölçüm değerleri tarih sayılmaz.
+    [GeneratedRegex(@"(?<!\d)(?:(?:0?[1-9]|[12]\d|3[01])[./-](?:0?[1-9]|1[0-2])[./-](?:(?:19|20)\d{2}|\d{2})|(?:19|20)\d{2}[./-](?:0?[1-9]|1[0-2])[./-](?:0?[1-9]|[12]\d|3[01]))(?!\d)",
+        RegexOptions.CultureInvariant)]
+    private static partial Regex TarihDeseni();
+
+    // "12 Mart 1971", "3 AĞUSTOS 1985", Türkçe klavyesiz "12 subat 1971": ay adı TurkceMetin.Katla ile karşılaştırılır.
+    [GeneratedRegex(@"(?<!\d)(?:0?[1-9]|[12]\d|3[01])\s+(\p{L}+),?\s+(?:19|20)\d{2}(?!\d)", RegexOptions.CultureInvariant)]
+    private static partial Regex YaziliTarihAdayi();
+
+    private static readonly HashSet<string> AyAdlari = new(StringComparer.Ordinal)
+    {
+        "ocak", "subat", "mart", "nisan", "mayis", "haziran", "temmuz", "agustos", "eylul", "ekim", "kasim", "aralik",
+    };
+
+    // 11 hane; araya en fazla üç ayırıcı (boşluk, nokta, tire/uzun tire, eğik çizgi, alt çizgi) girebilir
+    // ("100 000 001 46", "100 - 000 - 001 - 46"). Sağlama ayırıcılar atılarak yapılır.
+    [GeneratedRegex(@"(?<!\d)[1-9](?:[\s./\-–—_]{0,3}\d){10}(?!\d)", RegexOptions.CultureInvariant)]
     private static partial Regex TcAdayi();
 
-    // +90 532 123 45 67 · 0532 123 45 67 · 0 532-123-45-67 · 0532.123.45.67 · (532) 123 45 67 · 5321234567
-    // Sabit hat yalnızca başında 0 / +90 ile: 0212 555 44 33.
-    [GeneratedRegex(@"(?<![\d+])(?:(?:\+90[\s.-]?|90[\s.-]?|0[\s.-]?)?\(?5\d{2}\)?|(?:\+90[\s.-]?|0[\s.-]?)\(?[2-4]\d{2}\)?)[\s.-]?\d{3}[\s.-]?\d{2}[\s.-]?\d{2}(?!\d)",
+    // 0 / +90 önekiyle gruplamadan bağımsız: 5xx (cep) ya da 2-4xx (sabit) ile başlayan 10 hane, haneler arasında
+    // en fazla üç ayırıcı ya da parantez: 0532 12 34 567 · 05321 23 45 67 · 0532 - 123 - 45 - 67 · 0212 555 44 33.
+    // Öneksiz (ya da "90") yalnızca ilk üç hane bitişikse: 532 123 45 67 · (532) 123 45 67. Böylece "50 60 70 80 90"
+    // ya da "5.6 6.1 7.2 8.0 9.1" gibi ölçüm dizileri telefon sayılmaz. Virgül ayırıcı değildir (ondalık virgül).
+    [GeneratedRegex(@"(?<![\d+])(?:\+90|0)[\s./\-–—_]{0,3}\(?[2-5](?:[\s./()\-–—_]{0,3}\d){9}(?!\d)|(?<![\d+])(?:90[\s./\-–—_]{0,3})?\(?5\d{2}\)?(?:[\s./()\-–—_]{0,3}\d){7}(?!\d)",
         RegexOptions.CultureInvariant)]
     private static partial Regex TelefonDeseni();
 
@@ -71,6 +92,8 @@ public static partial class Maskeleyici
         metin = AsciiRakam(metin);
 
         var sonuc = EpostaDeseni().Replace(metin, Eposta);
+        sonuc = TarihDeseni().Replace(sonuc, Tarih);
+        sonuc = YaziliTarihAdayi().Replace(sonuc, m => AyAdlari.Contains(TurkceMetin.Katla(m.Groups[1].Value)) ? Tarih : m.Value);
         sonuc = TcAdayi().Replace(sonuc, m => TcKimlik.GecerliMi(Rakamlar(m.Value)) ? Tc : m.Value);
         sonuc = TelefonDeseni().Replace(sonuc, Telefon);
 
@@ -123,10 +146,10 @@ public static partial class Maskeleyici
         var kesme = sozcuk.AsSpan().IndexOfAny(['\'', '’', '‘', '`', '´']);
         if (kesme >= 0)
         {
-            // Kesme özel adın ekini ayırır: ekin ne olduğu önemli değil, uzunluğu sınırlı.
+            // Kesme özel adın ekini ayırır: kısa ek her zaman, uzun ek ("Kaya'larınki") listedeyse kabul.
             var govde = Sade(sozcuk[..kesme]);
-            var ek = sozcuk.Length - kesme - 1;
-            return ek <= EkSiniri && isimler.Contains(govde, StringComparer.Ordinal);
+            var ek = sozcuk[(kesme + 1)..];
+            return isimler.Contains(govde, StringComparer.Ordinal) && (ek.Length <= EkSiniri || Ekler.Contains(Sade(ek)));
         }
 
         var katli = Sade(sozcuk);

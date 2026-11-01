@@ -90,6 +90,27 @@ public sealed class OnAnamnezKararTestleri(KlinikApiFabrikasi fabrika) : IClassF
             r.GetProperty("onAnamnezId").ValueKind == JsonValueKind.String && r.GetProperty("onAnamnezId").GetGuid() == id);
     }
 
+    [Fact]
+    public async Task Iptal_edilen_randevunun_on_anamneziyle_yeniden_randevu_alinir()
+    {
+        var (hasta, id) = await OzetHazirAsync(SenaryoIdleri.Ayse);
+        Guid[] slotlar;
+        await using (var kapsam = fabrika.Services.CreateAsyncScope())
+        {
+            var db = kapsam.ServiceProvider.GetRequiredService<KlinikDbContext>();
+            var simdi = KlinikApiFabrikasi.Simdi.UtcDateTime;
+            slotlar = await db.Slotlar.Where(s => s.HekimId == SenaryoIdleri.HekimDahiliye1 && !s.Dolu && s.Baslangic > simdi)
+                .OrderBy(s => s.Baslangic).Select(s => s.Id).Take(2).ToArrayAsync();
+        }
+        var ilk = await Json(await hasta.PostAsJsonAsync("/api/randevular", new { slotId = slotlar[0], onAnamnezId = id }));
+        var kabul = await fabrika.GirisYapAsync("kabul");
+        (await kabul.PostAsync($"/api/randevular/{ilk.GetProperty("id").GetGuid()}/iptal", null)).EnsureSuccessStatusCode();
+
+        var yeniden = await hasta.PostAsJsonAsync("/api/randevular", new { slotId = slotlar[1], onAnamnezId = id });
+
+        Assert.Equal(HttpStatusCode.Created, yeniden.StatusCode);
+    }
+
     // Senaryo 2 (Fake): boğaz ağrısı + 38 °C → KBB önerisi, alternatif Dahiliye, aciliyet kodda Öncelikli.
     [Fact]
     public async Task Senaryo_2_bogaz_agrisi_KBB_onerir()

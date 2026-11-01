@@ -27,7 +27,7 @@ import { simdiSinyali } from '../ortak/simdi';
           @for (b of acikBranslar(); track b.id) {
             <button
               type="button"
-              class="min-h-12 rounded-lg border border-slate-300 px-4 text-left font-medium text-slate-900 hover:border-ana hover:bg-slate-50"
+              class="min-h-12 rounded-lg border border-slate-500 px-4 text-left font-medium text-slate-900 hover:border-ana hover:bg-slate-50"
               (click)="bransSec(b)"
             >
               {{ b.ad }}

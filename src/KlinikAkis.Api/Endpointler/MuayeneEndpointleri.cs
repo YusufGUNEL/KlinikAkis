@@ -81,6 +81,9 @@ public static class MuayeneEndpointleri
         if (sorun is not null) return sorun;
         if (muayene!.Durum == MuayeneDurumu.Kapali)
             return VizitKapali("Vizit kapandı; not değiştirilemez.");
+        // Onaylı epikriz bu nottan üretildi: not değişirse onaylı metin ve 103 paketi eski notla kalırdı.
+        if (await db.Epikrizler.AnyAsync(x => x.MuayeneId == muayene.Id && x.Durum == EpikrizDurumu.Onaylandi, ct))
+            return VizitKapali("Epikriz onaylandı; not değiştirilemez.");
 
         var metin = string.IsNullOrWhiteSpace(istek.Metin) ? null : istek.Metin.Trim();
         if (metin is { Length: > MetinSiniri })

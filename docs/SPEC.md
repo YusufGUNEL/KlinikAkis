@@ -170,6 +170,9 @@ Planlandi ──kabul──► KabulEdildi ──cagir──► Cagrildi ──b
 - Geçersiz geçiş → `409 Conflict` (ProblemDetails, "Randevu 'Planlandi' durumundayken çağrılamaz").
 - Ön anamnez kartı doktor tarafından **her durumda** görüntülenebilir (çağırmadan önce okumak gerçekçi).
 - `basla` bir `Muayene` kaydı açar; `kapat` muayeneyi kapatır ve 103 paketini kuyruğa ekler.
+- `iptal` randevuya bağlı ön anamnezin `RandevuId`'sini temizler; hasta aynı ön anamnezle yeniden randevu alabilir.
+- Eşzamanlı yazım (ikinci sekmeden aynı ön anamnezle randevu, aynı sonucu iki kez yayınlama, aynı kartın iki kararı)
+  EF eşzamanlılık belirteciyle yakalanır → 409; veri sessizce üzerine yazılmaz. AI çağrısı yapılmışsa AiAuditLog yine yazılır.
 
 ### 5.2 Outbox paket tetikleyicileri (simülasyon)
 - `kabul` → 101 Hasta Kayıt · `kapat` → 103 Muayene (epikriz onaylı mı bilgisiyle ve onaylı ICD-10 kodlarıyla; epikriz metni gitmez) ·
@@ -248,7 +251,7 @@ Tümü `/api` altında, JSON. Hata formatı ProblemDetails. Rol kontrolü JWT cl
 | GET | `/onanamnez/{id}` | doktor | Kart verisi |
 | POST | `/onanamnez/{id}/karar` | doktor | `onayla` / `duzenle` (metinle) / `reddet` |
 | GET | `/muayeneler/{id}` | doktor | (artı) Muayene durumu, hekim notu, son epikriz kartı (Epikriz sekmesi) |
-| PUT | `/muayeneler/{id}/not` | doktor | Hekim notu kaydet (yalnız randevunun hekimi, açık muayene, ≤ 2000 karakter) |
+| PUT | `/muayeneler/{id}/not` | doktor | Hekim notu kaydet (yalnız randevunun hekimi, açık muayene, epikriz onaylanmamış, ≤ 2000 karakter) |
 | GET | `/hastalar/{id}/tahliller` | doktor | Sonuçlar + işaret + trend serisi |
 | POST | `/tahliller/{id}/aciklama` | doktor | AI açıklama taslağı üret |
 | POST | `/tahliller/yayinla` | doktor | `{sonuclar: [{sonucId, aciklama}], bilgilendirme?}` (`TelefonlaBilgilendirildi` \| `Bilgilendirilecek`; kritik değer varsa zorunlu, §10.3); tek hasta; erişim kaydı + 105 outbox + `TahlilYayinlandi` |
@@ -318,6 +321,10 @@ cevaplarından hesaplanıp üstüne yazılır; yetişkine Çocuk Sağlığı ön
   "Ayşe'nin telefonu 0532 123 45 67" → "[AD] telefonu [TELEFON]". Karşılaştırma `TurkceMetin` ile
   katlanmış biçimde (büyük/küçük ve Türkçe harf farkı yok). Kayıtta olmayan isimler maskelenmez (§14 Sınırlar).
 - Hasta Id → takma ad (`P-7F3A`, kayıtta sabit), yaş → aralık (`50-59`), doğum tarihi gönderilmez.
+- **Tarih:** serbest metindeki tam tarih (`12.03.1971`, `1971-03-12`, `12 Mart 1971`; ay adı `TurkceMetin` ile katlanmış
+  karşılaştırılır) → `[TARIH]`; iki haneli yıl (`12.03.71`) da. Yılsız tarih ve ölçüm değeri (`7,4`) maskelenmez.
+  Telefon ve TC'de haneler arasına en fazla üç ayırıcı girebilir. `0`/`+90` önekli telefonda gruplama serbesttir;
+  öneksiz telefonda ilk üç hane bitişik olmalıdır, böylece "50 60 70 80 90" gibi ölçüm dizileri telefon sayılmaz.
 - Maskeli metin AiAuditLog'a yazılır ve "modele giden veri" panelinde aynen gösterilir.
 
 ### 9.3 Kırmızı bayrak kuralları (`KirmiziBayrakMotoru`, Domain, LLM'den önce)
@@ -753,6 +760,8 @@ nokta-ondalık, tarih biçimi kalıntısı); erişilebilirlik (kontrast, 48 px, 
 ne olduğu, ekran görüntüleri, çalıştırma, mimari özet, §14 Sınırlar), `docs/architecture.md` (Mermaid),
 GitHub Actions CI (zaman varsa test 13 ve 14 de CI'da). `/code-review` ve `/security-review` ile son
 tarama. Sonunda eksik listesi.
+**Karar (31.10.2026):** artı testler 13 (Playwright) ve 14 (Testcontainers) zaman nedeniyle atlandı (kullanıcı kararı;
+görüşmeye 3 gün, Aşama 10-11 bekliyor). README görüntüleri yerelde Gemini ile Chrome'dan alındı (`docs/img/`).
 
 ### 13.10 Eval + yerel model
 `eval/vakalar.json`: 12 Türkçe vaka (10 normal + 2 istem enjeksiyonu; beklenen bölüm + kırmızı bayrak
@@ -767,6 +776,8 @@ Son deploy, `/health` ısıtma, §1.3 kontrol listesi, iki cihazda 3 prova (mobi
 
 ## 14. Sınırlar (README'ye aynen girer)
 - Gerçek kimlik doğrulama yok; demo JWT rol seçimiyle verilir.
+- Hekim–hasta ilişkisi denetlenmez: doktor rolü kendi randevusu olmayan hastanın kaydını da açıp
+  onaylayabilir. Gerçek kimlik doğrulamada bu ilişki sunucuda denetlenir.
 - Maskeleme yalnızca kayıttaki ad/soyadı ve kalıplı kimlik verilerini yakalar; metindeki başka
   kişi adları ve adresler maskelenmez. Üretimde NER tabanlı ek katman gerekir. Ad aynı zamanda
   sözcükse ("Can", "Deniz") o sözcük de maskelenir (fazla maskeleme güvenli taraftır).

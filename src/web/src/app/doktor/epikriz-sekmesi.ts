@@ -30,18 +30,23 @@ export function epikrizMetni(t: EpikrizTaslagi): string {
           id="hekim-notu"
           rows="3"
           maxlength="2000"
-          class="rounded-md border border-slate-500 p-2"
-          [disabled]="kapali()"
+          class="rounded-md border border-slate-500 p-2 disabled:bg-slate-100 disabled:text-slate-600"
+          [disabled]="notKilitli()"
+          [attr.aria-describedby]="notKilitli() ? 'not-kilit-nedeni' : null"
           [value]="not()"
           (input)="not.set($any($event.target).value); notDurumu.set('')"
         ></textarea>
         <div class="flex items-center gap-3">
-          <button pButton type="submit" size="small" severity="secondary" variant="outlined" class="ikincil" [disabled]="kapali() || islemde() || !notDegisti()">
+          <button pButton type="submit" size="small" severity="secondary" variant="outlined" class="ikincil" [disabled]="notKilitli() || islemde() || !notDegisti()">
             Notu kaydet
           </button>
-          <span class="text-slate-700" role="status">{{ notDurumu() }}</span>
+          @if (!notKilitli()) {
+            <span class="text-slate-700" role="status">{{ notDurumu() }}</span>
+          }
           @if (kapali()) {
-            <span class="text-slate-700">Vizit kapandı; not değiştirilemez.</span>
+            <span id="not-kilit-nedeni" class="text-slate-700">Vizit kapandı; not değiştirilemez.</span>
+          } @else if (epikrizOnayli()) {
+            <span id="not-kilit-nedeni" class="text-slate-700" data-test="not-kilitli">Epikriz onaylandı; not değiştirilemez.</span>
           }
         </div>
       </form>
@@ -169,6 +174,9 @@ export class EpikrizSekmesi {
   private readonly bekleyenOdak = signal(false);
 
   protected readonly kapali = computed(() => this.detay().durum === 'Kapali');
+  // Onaylı epikriz nottan üretildi: not değişirse onaylı metinle 103 paketi birbirini tutmaz (sunucu da 409 verir).
+  protected readonly epikrizOnayli = computed(() => this.detay().epikriz?.durum === 'Onaylandi');
+  protected readonly notKilitli = computed(() => this.kapali() || this.epikrizOnayli());
   protected readonly notDegisti = computed(() => this.not().trim() !== (this.detay().hekimNotu ?? ''));
   protected readonly onay = computed<HekimOnayi | null>(() => {
     const k = this.detay().epikriz?.karar;
@@ -208,7 +216,7 @@ export class EpikrizSekmesi {
     this.uretiliyor.set(true);
     await this.calistir(async () => {
       // Kaydedilmemiş not varsa önce kaydedilir: taslak ekrandaki notla üretilsin.
-      if (this.notDegisti() && !this.kapali()) await this.islemler.notKaydet(this.detay().id, this.not().trim() || null);
+      if (this.notDegisti() && !this.notKilitli()) await this.islemler.notKaydet(this.detay().id, this.not().trim() || null);
       await this.islemler.epikrizUret(this.detay().id);
       // Kart üst bileşen muayeneyi yeniden çekince gelir; odak o zaman verilir (yoksa body'ye düşer).
       this.bekleyenOdak.set(true);

@@ -6,6 +6,7 @@ import { KimlikOgesi, Rol, ROLLER } from '../cekirdek/api';
 import { Demo } from '../cekirdek/demo';
 import { Oturum, rolAnaSayfasi } from '../cekirdek/oturum';
 import { DurumKutusu } from '../ortak/durum-kutusu';
+import { IkiAdimliOnay } from '../ortak/iki-adimli-onay';
 import { SentetikRozeti } from '../ortak/sentetik-rozeti';
 
 interface RolKarti {
@@ -112,9 +113,10 @@ const LISTE_BASLIGI: Partial<Record<Rol, string>> = {
       }
 
       <footer class="mt-10 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4">
-        <button pButton type="button" severity="secondary" variant="outlined" class="min-h-12 text-slate-700" [disabled]="sifirlaniyor()" (click)="sifirla()">
-          {{ sifirlaniyor() ? 'Sıfırlanıyor…' : 'Demo verisini sıfırla' }}
+        <button pButton type="button" severity="secondary" variant="outlined" class="ikincil min-h-12" [class.onay-bekliyor]="sifirlaOnayi.bekliyor()" [disabled]="sifirlaniyor()" (click)="sifirla()">
+          {{ sifirlaniyor() ? 'Sıfırlanıyor…' : sifirlaOnayi.bekliyor() ? 'Emin misiniz? Sıfırla' : 'Demo verisini sıfırla' }}
         </button>
+        <span class="sr-only" aria-live="polite">{{ sifirlaOnayi.bekliyor() ? sifirlaOnayi.duyuru : '' }}</span>
         @if (sifirlamaMesaji()) {
           <span class="text-slate-700" role="status">{{ sifirlamaMesaji() }}</span>
         }
@@ -136,6 +138,7 @@ export class Giris implements OnInit {
   protected readonly girisSuruyor = signal(false);
   protected readonly hata = signal('');
   protected readonly sifirlaniyor = signal(false);
+  protected readonly sifirlaOnayi = new IkiAdimliOnay();
   protected readonly sifirlamaMesaji = signal('');
 
   protected readonly kimlikler = httpResource<KimlikOgesi[]>(() => {
@@ -177,6 +180,7 @@ export class Giris implements OnInit {
   }
 
   protected async sifirla(): Promise<void> {
+    if (!this.sifirlaOnayi.onaylandi()) return;
     this.sifirlaniyor.set(true);
     this.sifirlamaMesaji.set('');
     try {

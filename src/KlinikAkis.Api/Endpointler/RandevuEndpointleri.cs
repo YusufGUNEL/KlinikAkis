@@ -105,6 +105,12 @@ public static class RandevuEndpointleri
         {
             await db.SaveChangesAsync(ct);
         }
+        catch (DbUpdateConcurrencyException)
+        {
+            // OnAnamnez.RandevuId belirteci: aynı ön anamnezle eşzamanlı ikinci randevu reddedilir.
+            return TypedResults.Problem(detail: "Bu şikayet kaydıyla zaten randevu alındı.",
+                statusCode: StatusCodes.Status409Conflict);
+        }
         catch (DbUpdateException)
         {
             // Aynı slota eşzamanlı istek: SlotId benzersiz indeksi ikinciyi reddeder. Başka bir kısıt hatası
@@ -227,6 +233,11 @@ public static class RandevuEndpointleri
                 break;
             case RandevuEylemi.Iptal:
                 randevu.Slot!.Dolu = false; // iptal edilen saat yeniden alınabilir
+                // Ön anamnez de serbest kalır: hasta aynı şikayetle yeni randevu alabilir, kart iptal edilen hekime gitmez.
+                if (randevu.OnAnamnezId is { } iptalOnAnamnezId
+                    && await db.OnAnamnezler.FindAsync([iptalOnAnamnezId], ct) is { } iptalOnAnamnez
+                    && iptalOnAnamnez.RandevuId == randevu.Id)
+                    iptalOnAnamnez.RandevuId = null;
                 break;
         }
         try
