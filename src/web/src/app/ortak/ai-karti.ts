@@ -1,6 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, input } from '@angular/core';
 import { AiKaynak } from '../cekirdek/api';
+import { Ikon } from './ikon';
 
 export interface HekimOnayi {
   hekimAd: string;
@@ -18,7 +19,7 @@ export interface HekimOnayi {
  */
 @Component({
   selector: 'app-ai-karti',
-  imports: [DatePipe],
+  imports: [DatePipe, Ikon],
   template: `
     <section
       class="rounded-lg border-2 border-ai bg-ai/5 p-4"
@@ -40,7 +41,7 @@ export interface HekimOnayi {
       </div>
       @if (onay(); as o) {
         <p class="mt-3 text-sm font-medium text-ai" data-test="ai-onay">
-          <span aria-hidden="true">{{ o.reddedildi ? '✕' : '✓' }}</span> {{ o.hekimAd }} {{ o.eylem ?? 'onayladı' }}
+          <span class="sr-only">{{ o.reddedildi ? '✕' : '✓' }}</span><app-ikon [adi]="o.reddedildi ? 'hata' : 'tamamlandi'" /> {{ o.hekimAd }} {{ o.eylem ?? 'onayladı' }}
           <span class="tabular-nums">{{ o.zaman | date: 'HH:mm' }}</span>
         </p>
       } @else {

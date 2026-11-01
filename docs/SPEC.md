@@ -652,10 +652,8 @@ Her aşama kendi testlerini **o aşamada** yazar; Aşama 9 eksik kalan varsa tam
 - Render ücretsiz web servisi (Docker) + Neon Postgres. Render'ın verdiği `PORT` değişkeni
   `Program.cs`'te okunur. Ters vekil arkasında `ForwardedHeaders` (imajda `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`). Health check yolu `/api/health`.
 - Ortam değişkenleri: `ConnectionStrings__Default` (Neon, `SSL Mode=Require`), `Db__Provider=Postgres`,
-  `AI__Provider` (Render'da `Gemini`), `GEMINI_API_KEY`, `Jwt__Key`, `AI__GunlukLimit`. Angular derlemesi için
-  `PRIMEUI_LICENSE` (Docker build argümanı; PrimeNG 22 PrimeUI License ile gelir, ücretsiz Community
-  anahtarı yoksa sayfada lisans uyarısı çıkar). Yerelde `src/web/.primeui-license` dosyası; ikisi de repoya girmez. `src/web/scripts/lisans-yaz.mjs`
-  (`npm start/build/test` öncesi çalışır) anahtarı ignore edilen `src/app/lisans.ts`'e yazar.
+  `AI__Provider` (Render'da `Gemini`), `GEMINI_API_KEY`, `Jwt__Key`, `AI__GunlukLimit`. Bu bireysel
+  demo için PrimeUI lisans yapılandırması kullanılmaz; uygulama lisans uyarısı göstermeden çalışır.
 - Yerel geliştirme: Angular `proxy.conf.json` ile `/api` ve `/hubs` (`ws: true`) backend'e → yerelde
   de tek origin, CORS yok. Telefondan yerel test: Cloudflare Quick Tunnel.
 - Render 15 dk boşta uyur (~1 dk uyanma): görüşmeden 10 dk önce `/api/health` çağır.

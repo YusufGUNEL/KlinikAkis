@@ -5,6 +5,7 @@ import { QRCodeComponent } from 'angularx-qrcode';
 import { ButtonModule } from 'primeng/button';
 import { TabsModule } from 'primeng/tabs';
 import { DenetimSatiri, ErisimSatiri, HastaOzeti, MuayeneDetayi, OnAnamnezDetayi, OutboxSatiri, RandevuEylemi, RandevuSatiri } from '../cekirdek/api';
+import { Demo } from '../cekirdek/demo';
 import { HubService, hubIleYenile } from '../cekirdek/hub';
 import { EYLEM_ETIKETI, EYLEM_SONUCU, hataMesaji, RandevuIslemleri, saatEtiketi } from '../cekirdek/randevu';
 import { ISARET_ETIKETI, TahlilSatiri } from '../cekirdek/tahlil';
@@ -13,6 +14,7 @@ import { DurumKutusu } from '../ortak/durum-kutusu';
 import { DurumRozeti } from '../ortak/durum-rozeti';
 import { GonderimKutusu, PAKET_ADI } from '../ortak/gonderim-kutusu';
 import { HastaBandi } from '../ortak/hasta-bandi';
+import { IkiAdimliOnay } from '../ortak/iki-adimli-onay';
 import { simdiSinyali } from '../ortak/simdi';
 import { UstCubuk } from '../ortak/ust-cubuk';
 import { EpikrizSekmesi } from './epikriz-sekmesi';
@@ -64,11 +66,12 @@ const OZELLIK_ADI: Record<string, string> = {
     <div class="flex h-dvh flex-col text-sm">
       <app-ust-cubuk ekran="Doktor"><app-baglanti-gostergesi [durum]="hub.durum()" /></app-ust-cubuk>
       <div class="grid min-h-0 flex-1 grid-cols-[16rem_minmax(0,1fr)_18rem]">
-        <nav class="flex min-h-0 flex-col border-r border-slate-200 bg-white" aria-labelledby="bugun-baslik">
+        <nav class="flex min-h-0 flex-col border-r border-slate-200 bg-white" aria-labelledby="randevular-baslik">
           <div class="min-h-0 flex-1 overflow-y-auto p-3">
-            <h2 id="bugun-baslik" class="text-xs font-semibold tracking-wide text-slate-600 uppercase">
-              Bugün · <span class="tabular-nums">{{ bugun() | date }}</span>
-            </h2>
+            <h2 id="randevular-baslik" class="text-xs font-semibold tracking-wide text-slate-600 uppercase">Yaklaşan randevular</h2>
+            <p class="mt-1 text-xs text-slate-600">
+              Sonraki 24 saat · <span class="tabular-nums">{{ bugun() | date }}</span>
+            </p>
             <div class="mt-3">
               @if (liste.error()) {
                 <app-durum-kutusu tur="hata" (yenidenDene)="liste.reload()" />
@@ -93,7 +96,27 @@ const OZELLIK_ADI: Record<string, string> = {
                       </button>
                     </li>
                   } @empty {
-                    <li><app-durum-kutusu tur="bos" mesaj="Bugün listede randevu yok." /></li>
+                    <li>
+                      <app-durum-kutusu tur="bos" mesaj="Yaklaşan randevu yok.">
+                        <button
+                          pButton
+                          type="button"
+                          severity="secondary"
+                          variant="outlined"
+                          class="ikincil min-h-12"
+                          data-test="demo-sifirla"
+                          [class.onay-bekliyor]="sifirlaOnayi.bekliyor()"
+                          [disabled]="sifirlaniyor()"
+                          (click)="sifirla()"
+                        >
+                          {{ sifirlaniyor() ? 'Sıfırlanıyor…' : sifirlaOnayi.bekliyor() ? 'Emin misiniz? Sıfırla' : 'Demo verisini sıfırla' }}
+                        </button>
+                        <span class="sr-only" role="status">{{ sifirlaOnayi.bekliyor() ? sifirlaOnayi.duyuru : sifirlamaMesaji() }}</span>
+                        @if (sifirlamaMesaji()) {
+                          <p class="text-xs" [class.text-uyari]="sifirlamaHatasi()">{{ sifirlamaMesaji() }}</p>
+                        }
+                      </app-durum-kutusu>
+                    </li>
                   }
                 </ul>
               } @else {
@@ -238,7 +261,7 @@ const OZELLIK_ADI: Record<string, string> = {
             }
           </section>
           <section class="border-b border-slate-100 py-3" aria-labelledby="mgv-yan-baslik">
-            <h2 id="mgv-yan-baslik" class="text-xs font-semibold tracking-wide text-slate-600 uppercase">Modele giden veri</h2>
+            <h2 id="mgv-yan-baslik" class="text-xs font-semibold tracking-wide text-slate-600 uppercase">AI denetimi</h2>
             @if (sonDenetim(); as d) {
               <p class="mt-1 text-slate-700">
                 <span class="tabular-nums">{{ d.zaman | date: 'HH:mm' }}</span> · {{ saglayiciEtiketi(d.saglayici) }} ·
@@ -297,8 +320,13 @@ const OZELLIK_ADI: Record<string, string> = {
 export class Doktor {
   protected readonly hub = inject(HubService);
   private readonly islemler = inject(RandevuIslemleri);
+  private readonly demo = inject(Demo);
 
   protected readonly bugun = simdiSinyali();
+  protected readonly sifirlaniyor = signal(false);
+  protected readonly sifirlaOnayi = new IkiAdimliOnay();
+  protected readonly sifirlamaMesaji = signal('');
+  protected readonly sifirlamaHatasi = signal(false);
   protected readonly doktorEylemleri = DOKTOR_EYLEMLERI;
   protected readonly etiketler = EYLEM_ETIKETI;
   protected readonly saglayiciEtiketi = saglayiciEtiketi;
@@ -399,6 +427,26 @@ export class Doktor {
 
   protected sekmeSec(deger: string | number | undefined): void {
     if (deger === 'ozet' || deger === 'tahliller' || deger === 'epikriz') this.sekme.set(deger);
+  }
+
+  /** Boş listede: demo verisini iki adımlı onayla bugüne göre yeniden üret. */
+  protected async sifirla(): Promise<void> {
+    if (!this.sifirlaOnayi.onaylandi()) return;
+    this.sifirlaniyor.set(true);
+    this.sifirlamaMesaji.set('');
+    this.sifirlamaHatasi.set(false);
+    try {
+      const s = await this.demo.sifirla();
+      this.seciliId.set(null);
+      this.duyuru.set('Demo verisi sıfırlandı.');
+      this.sifirlamaMesaji.set(`Demo verisi sıfırlandı · ${s.hasta} hasta, ${s.randevu} randevu`);
+      this.liste.reload();
+    } catch {
+      this.sifirlamaHatasi.set(true);
+      this.sifirlamaMesaji.set('Sıfırlanamadı. Sunucunun çalıştığını kontrol edin.');
+    } finally {
+      this.sifirlaniyor.set(false);
+    }
   }
 
   /** Taslak/yayın sonrası: tablo, denetim paneli ve erişim kaydı (yayın satırı). */

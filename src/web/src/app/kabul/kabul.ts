@@ -35,7 +35,7 @@ const DURUM_ADI: Record<RandevuDurumu, string> = {
       <main class="mx-auto w-full max-w-6xl p-4">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <h1 class="text-xl font-semibold text-slate-900">
-            Kabul · Bugün <span class="tabular-nums">{{ bugun() | date }}</span>
+            Kabul · Sonraki 24 saat <span class="tabular-nums">{{ bugun() | date }}</span>
           </h1>
           <span class="flex items-center gap-3">
             @if (gonderimHatasi()) {
@@ -61,8 +61,8 @@ const DURUM_ADI: Record<RandevuDurumu, string> = {
         <p class="sr-only" role="status">{{ duyuru() }}</p>
 
         <table class="mt-4 w-full border-collapse bg-white text-[13px]">
-          <caption class="sr-only">Günün randevuları</caption>
-          <thead>
+          <caption class="sr-only">Sonraki 24 saatteki randevular</caption>
+          <thead class="sticky top-0 z-10 bg-white">
             <tr class="border-b border-slate-200 text-left text-slate-600">
               @for (sutun of sutunlar; track sutun) {
                 <th scope="col" class="h-9 px-3 font-semibold">{{ sutun }}</th>
@@ -95,7 +95,7 @@ const DURUM_ADI: Record<RandevuDurumu, string> = {
                           <button
                             pButton
                             type="button"
-                            size="small"
+                            class="min-h-12"
                             [severity]="e === 'Kabul' ? 'primary' : 'secondary'"
                             [variant]="e === 'Kabul' ? undefined : 'outlined'"
                             [class.ikincil]="e !== 'Kabul'"
@@ -111,7 +111,7 @@ const DURUM_ADI: Record<RandevuDurumu, string> = {
                   </td>
                 </tr>
               } @empty {
-                <tr><td [attr.colspan]="sutunlar.length" class="p-3"><app-durum-kutusu tur="bos" mesaj="Bugün kabul bekleyen randevu yok." /></td></tr>
+                <tr><td [attr.colspan]="sutunlar.length" class="p-3"><app-durum-kutusu tur="bos" mesaj="Sonraki 24 saatte kabul bekleyen randevu yok." /></td></tr>
               }
             } @else {
               <tr><td [attr.colspan]="sutunlar.length" class="p-3"><app-durum-kutusu tur="yukleniyor" /></td></tr>

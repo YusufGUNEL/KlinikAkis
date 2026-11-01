@@ -6,6 +6,7 @@ import { OutboxDurumu, OutboxPaketTipi, OutboxSatiri } from '../cekirdek/api';
 import { OutboxIslemleri } from '../cekirdek/outbox';
 import { hataMesaji } from '../cekirdek/randevu';
 import { DurumKutusu } from './durum-kutusu';
+import { Ikon } from './ikon';
 
 export const PAKET_ADI: Record<OutboxPaketTipi, string> = {
   HastaKayit: '101 Hasta Kayıt',
@@ -14,10 +15,10 @@ export const PAKET_ADI: Record<OutboxPaketTipi, string> = {
 };
 
 /** Renk tek ipucu değil: ikon + metin (SPEC §10.1). İş kuralı hatası amber; kırmızı yalnız klinik uyarıya ayrılı. */
-export const OUTBOX_DURUMU: Record<OutboxDurumu, { ikon: string; metin: string; renk: string }> = {
-  Gonderildi: { ikon: '✓', metin: 'Gönderildi', renk: 'text-basari' },
-  IsKuraliHatasi: { ikon: '⚠', metin: 'İş kuralı', renk: 'text-uyari' },
-  Bekliyor: { ikon: '◌', metin: 'Bekliyor', renk: 'text-slate-600' },
+export const OUTBOX_DURUMU: Record<OutboxDurumu, { ikon: string; ikonAdi: 'tamamlandi' | 'uyari' | 'bekliyor'; metin: string; renk: string }> = {
+  Gonderildi: { ikon: '✓', ikonAdi: 'tamamlandi', metin: 'Gönderildi', renk: 'text-basari' },
+  IsKuraliHatasi: { ikon: '⚠', ikonAdi: 'uyari', metin: 'İş kuralı', renk: 'text-uyari' },
+  Bekliyor: { ikon: '◌', ikonAdi: 'bekliyor', metin: 'Bekliyor', renk: 'text-slate-600' },
 };
 
 /**
@@ -27,7 +28,7 @@ export const OUTBOX_DURUMU: Record<OutboxDurumu, { ikon: string; metin: string; 
  */
 @Component({
   selector: 'app-gonderim-kutusu',
-  imports: [ButtonModule, DatePipe, DurumKutusu],
+  imports: [ButtonModule, DatePipe, DurumKutusu, Ikon],
   template: `
     <section [attr.aria-labelledby]="baslikId()">
       <h2 [id]="baslikId()" tabindex="-1" class="flex items-center gap-2" [class]="kompakt() ? 'text-xs font-semibold tracking-wide text-slate-600 uppercase' : 'text-base font-semibold text-slate-900'">
@@ -41,7 +42,7 @@ export const OUTBOX_DURUMU: Record<OutboxDurumu, { ikon: string; metin: string; 
             @for (p of liste().value(); track p.id) {
               <li class="text-slate-700">
                 <span class="tabular-nums">{{ p.zaman | date: 'HH:mm' }}</span> · {{ paketAdi[p.paketTipi] }} ·
-                <span class="font-medium" [class]="durumlar[p.durum].renk"><span aria-hidden="true">{{ durumlar[p.durum].ikon }} </span>{{ durumlar[p.durum].metin }}</span>
+                <span class="font-medium" [class]="durumlar[p.durum].renk"><span class="sr-only">{{ durumlar[p.durum].ikon }} </span>{{ durumlar[p.durum].metin }} <app-ikon [adi]="durumlar[p.durum].ikonAdi" /></span>
                 @if (p.hata) {
                   <span class="block text-xs text-slate-600">{{ p.hata }}</span>
                 }
@@ -69,7 +70,7 @@ export const OUTBOX_DURUMU: Record<OutboxDurumu, { ikon: string; metin: string; 
                   <td class="px-3">{{ paketAdi[p.paketTipi] }}</td>
                   <td class="px-3 font-mono">{{ p.hastaTakmaAdi }}</td>
                   <td class="px-3">
-                    <span class="font-medium" [class]="durumlar[p.durum].renk"><span aria-hidden="true">{{ durumlar[p.durum].ikon }} </span>{{ durumlar[p.durum].metin }}</span>
+                    <span class="font-medium" [class]="durumlar[p.durum].renk"><span class="sr-only">{{ durumlar[p.durum].ikon }} </span>{{ durumlar[p.durum].metin }} <app-ikon [adi]="durumlar[p.durum].ikonAdi" /></span>
                     @if (p.hata) {
                       <span class="ml-2 text-slate-600">{{ p.hata }}</span>
                     }
@@ -89,7 +90,7 @@ export const OUTBOX_DURUMU: Record<OutboxDurumu, { ikon: string; metin: string; 
         }
       } @else if (liste().error() && kompakt()) {
         <!-- Yan panelin öteki bölümleriyle aynı küçük kalıp. -->
-        <p class="mt-1 text-uyari" role="alert"><span aria-hidden="true">⚠</span> Yüklenemedi.</p>
+        <p class="mt-1 text-uyari" role="alert"><app-ikon adi="uyari" /> Yüklenemedi.</p>
         <button pButton type="button" size="small" variant="outlined" class="ikincil mt-2" (click)="liste().reload()">Yeniden dene</button>
       } @else if (liste().error()) {
         <app-durum-kutusu tur="hata" mesaj="Gönderim kutusu alınamadı." (yenidenDene)="liste().reload()" />
@@ -100,7 +101,7 @@ export const OUTBOX_DURUMU: Record<OutboxDurumu, { ikon: string; metin: string; 
       }
 
       @if (hata()) {
-        <p class="mt-1 font-medium text-uyari" role="alert"><span aria-hidden="true">⚠</span> {{ hata() }}</p>
+        <p class="mt-1 font-medium text-uyari" role="alert"><app-ikon adi="uyari" /> {{ hata() }}</p>
       }
     </section>
   `,

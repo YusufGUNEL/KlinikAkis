@@ -6,6 +6,7 @@ import { OnAnamnezIslemleri } from '../cekirdek/onanamnez';
 import { hataMesaji } from '../cekirdek/randevu';
 import { AiKarti } from '../ortak/ai-karti';
 import { DurumKutusu } from '../ortak/durum-kutusu';
+import { Ikon } from '../ortak/ikon';
 
 interface GecmisAdim {
   soru: string;
@@ -34,7 +35,7 @@ type HastaCevabi = 'bekliyor' | 'duzeltiyor' | 'dogru' | 'notlu';
  */
 @Component({
   selector: 'app-sikayet',
-  imports: [AiKarti, ButtonModule, DurumKutusu, RouterLink],
+  imports: [AiKarti, ButtonModule, DurumKutusu, Ikon, RouterLink],
   template: `
     <a routerLink=".." class="inline-flex min-h-12 items-center text-base font-medium text-ana">← Randevularım</a>
     <h1 class="mt-2 text-2xl font-semibold text-slate-900">Şikayetiniz</h1>
@@ -60,7 +61,7 @@ type HastaCevabi = 'bekliyor' | 'duzeltiyor' | 'dogru' | 'notlu';
     <ol class="mt-4 flex flex-col gap-3" aria-label="Sohbet">
       @for (g of gecmis(); track $index) {
         <li class="flex flex-col gap-2">
-          <p class="text-slate-900"><span aria-hidden="true">🩺 </span>{{ g.soru }}</p>
+          <p class="text-slate-900"><app-ikon adi="doktor" /> {{ g.soru }}</p>
           <p class="max-w-[85%] self-end rounded-lg bg-ana/10 px-3 py-2 text-slate-900 [overflow-wrap:anywhere]">
             <span class="sr-only">Cevabınız: </span>{{ g.cevap }}
           </p>
@@ -71,12 +72,12 @@ type HastaCevabi = 'bekliyor' | 'duzeltiyor' | 'dogru' | 'notlu';
 
     @if (bayrak(); as b) {
       <div id="kirmizi-bayrak" tabindex="-1" class="mt-4 outline-none rounded-lg bg-tehlike p-4 text-white" role="alert">
-        <p class="text-lg font-semibold"><span aria-hidden="true">⚠ </span>{{ b.mesaj }}</p>
+        <p class="text-lg font-semibold"><app-ikon adi="uyari" /> {{ b.mesaj }}</p>
         <a
           [attr.href]="acilArama"
           class="mt-3 flex min-h-12 items-center justify-center rounded-lg bg-white text-lg font-semibold text-tehlike focus-visible:outline-white"
         >
-          <span aria-hidden="true">📞 </span>112'yi arayın
+          <app-ikon adi="uyari" /> 112'yi arayın
         </a>
         <p class="mt-3 text-base">Bu belirtilerle randevu beklemeyin. Randevu adımı durduruldu.</p>
       </div>
@@ -85,7 +86,7 @@ type HastaCevabi = 'bekliyor' | 'duzeltiyor' | 'dogru' | 'notlu';
     } @else if (asama() === 'sohbet' && soru(); as s) {
       <section class="mt-4" aria-labelledby="guncel-soru" [attr.aria-busy]="gonderiliyor()">
         <h2 id="guncel-soru" tabindex="-1" class="font-semibold outline-none text-slate-900">
-          <span aria-hidden="true">🩺 </span>{{ s.metin }}
+          <app-ikon adi="doktor" /> {{ s.metin }}
         </h2>
 
         @if (s.secenekler.length) {
@@ -138,7 +139,7 @@ type HastaCevabi = 'bekliyor' | 'duzeltiyor' | 'dogru' | 'notlu';
           <!-- Çoklu seçimde tek düğme "Devam": seçim + yazı birlikte gider (Enter yine gönderir). -->
           @if (!s.cokluSecim) {
             <button pButton type="submit" class="min-h-12 min-w-12" aria-label="Gönder" [disabled]="gonderiliyor() || !gonderilebilir()">
-              <span aria-hidden="true">➤</span>
+              <app-ikon adi="cagrildi" />
             </button>
           }
         </form>
@@ -152,7 +153,7 @@ type HastaCevabi = 'bekliyor' | 'duzeltiyor' | 'dogru' | 'notlu';
         <p class="mt-2 min-h-6 text-base text-slate-700" role="status">{{ gonderiliyor() ? 'Gönderiliyor…' : '' }}</p>
 
         @if (hata()) {
-          <p class="mt-3 font-medium text-uyari" role="alert"><span aria-hidden="true">⚠</span> {{ hata() }}</p>
+          <p class="mt-3 font-medium text-uyari" role="alert"><app-ikon adi="uyari" /> {{ hata() }}</p>
         }
       </section>
     } @else if (asama() === 'ozet') {
@@ -215,7 +216,7 @@ type HastaCevabi = 'bekliyor' | 'duzeltiyor' | 'dogru' | 'notlu';
         </app-ai-karti>
 
         @if (hata()) {
-          <p class="mt-3 font-medium text-uyari" role="alert"><span aria-hidden="true">⚠</span> {{ hata() }}</p>
+          <p class="mt-3 font-medium text-uyari" role="alert"><app-ikon adi="uyari" /> {{ hata() }}</p>
         }
 
         @if (cevap() === 'dogru' || cevap() === 'notlu') {
@@ -248,7 +249,7 @@ type HastaCevabi = 'bekliyor' | 'duzeltiyor' | 'dogru' | 'notlu';
 
     @if (!bayrak()) {
       <p class="sticky bottom-0 -mx-4 mt-6 border-t border-slate-200 bg-white px-4 py-1 text-base text-slate-700">
-        <span aria-hidden="true">⚠ </span>Göğüs ağrısı, nefes darlığı ya da bilinç kaybı varsa beklemeyin:
+        <app-ikon adi="uyari" /> Göğüs ağrısı, nefes darlığı ya da bilinç kaybı varsa beklemeyin:
         <a [attr.href]="acilArama" class="inline-flex min-h-12 items-center font-semibold text-slate-900" [class.text-ana]="acilArama" [class.underline]="acilArama">112'yi arayın</a>
       </p>
     }

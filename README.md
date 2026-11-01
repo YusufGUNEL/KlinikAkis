@@ -70,7 +70,9 @@ Telefon / Dizüstü / TV ──REST (JWT)──► Minimal API ──► Domain 
 ```
 
 Ayrıntılı şemalar (bileşenler, AI hattı, canlı senkron): [docs/architecture.md](docs/architecture.md) ·
-Teknik şartname: [docs/SPEC.md](docs/SPEC.md)
+Teknik şartname: [docs/SPEC.md](docs/SPEC.md) ·
+Proje raporu: [docs/KlinikAkis-Proje-Raporu.md](docs/KlinikAkis-Proje-Raporu.md) ·
+[PDF raporu](docs/KlinikAkis-Proje-Raporu.pdf)
 
 ## Yerelde çalıştırma
 
@@ -101,7 +103,8 @@ cd src/web && npm test      # Angular (Vitest)
 Kapsananlar: kırmızı bayrakta LLM'in çağrılmaması, Türkçe çekimli/büyük harfli belirtiler, TC/telefon/e-posta ve
 ekli ad maskeleme, cinsiyete göre tahlil işareti ve kritik eşikler, listede olmayan bölümün reddi, zaman aşımında
 yedek, yayınlanmamış sonucun hastaya görünmemesi ve başka hastaya 403, randevu durum makinesi (geçersiz geçiş 409),
-deterministik seed, SignalR grup yayını, hasta bandında alerji gösterimi.
+deterministik seed, SignalR grup yayını, doktor ve hasta ekranında alerji gösterimi, hasta özet endpoint'inin rol
+yetkisi.
 
 ## Sınırlar
 

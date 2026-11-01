@@ -99,6 +99,16 @@ function buton(el: HTMLElement, metin: string): HTMLButtonElement {
 }
 
 describe('Doktor', () => {
+  it('boş listede yaklaşan başlığı ve demo sıfırlama düğmesi gösterir', async () => {
+    const { fixture, http, el } = await kur();
+    listeyiVer(http, []);
+    await fixture.whenStable();
+
+    expect(el.textContent).toContain('Yaklaşan randevular');
+    expect(el.textContent).toContain('Yaklaşan randevu yok.');
+    expect(buton(el, 'Demo verisini sıfırla')).toBeTruthy();
+  });
+
   it('eylem butonları sunucunun izinliEylemler listesine göre etkinleşir', async () => {
     const { fixture, http, el } = await kur();
     listeyiVer(http, [satir('KabulEdildi', ['Cagir'])]);

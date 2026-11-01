@@ -8,19 +8,20 @@ import { Oturum, rolAnaSayfasi } from '../cekirdek/oturum';
 import { DurumKutusu } from '../ortak/durum-kutusu';
 import { IkiAdimliOnay } from '../ortak/iki-adimli-onay';
 import { SentetikRozeti } from '../ortak/sentetik-rozeti';
+import { Ikon, IkonAdi } from '../ortak/ikon';
 
 interface RolKarti {
   rol: Rol;
   baslik: string;
   aciklama: string;
-  ikon: string;
+  ikon: IkonAdi;
 }
 
 const KARTLAR: RolKarti[] = [
-  { rol: 'hasta', baslik: 'Hasta', aciklama: 'Telefon ekranı', ikon: '📱' },
-  { rol: 'doktor', baslik: 'Doktor', aciklama: 'Poliklinik çalışma alanı', ikon: '🩺' },
-  { rol: 'kabul', baslik: 'Kabul', aciklama: 'Hasta kabul masası', ikon: '🗂️' },
-  { rol: 'tv', baslik: 'TV', aciklama: 'Bekleme salonu sıra ekranı', ikon: '📺' },
+  { rol: 'hasta', baslik: 'Hasta', aciklama: 'Telefon ekranı', ikon: 'hasta' },
+  { rol: 'doktor', baslik: 'Doktor', aciklama: 'Poliklinik çalışma alanı', ikon: 'doktor' },
+  { rol: 'kabul', baslik: 'Kabul', aciklama: 'Hasta kabul masası', ikon: 'kabul' },
+  { rol: 'tv', baslik: 'TV', aciklama: 'Bekleme salonu sıra ekranı', ikon: 'tv' },
 ];
 
 const LISTE_BASLIGI: Partial<Record<Rol, string>> = {
@@ -35,7 +36,7 @@ const LISTE_BASLIGI: Partial<Record<Rol, string>> = {
  */
 @Component({
   selector: 'app-giris',
-  imports: [ButtonModule, DurumKutusu, SentetikRozeti],
+  imports: [ButtonModule, DurumKutusu, Ikon, SentetikRozeti],
   template: `
     <main class="mx-auto max-w-3xl px-4 py-8">
       <header class="flex flex-wrap items-center justify-between gap-2">
@@ -58,7 +59,7 @@ const LISTE_BASLIGI: Partial<Record<Rol, string>> = {
               [disabled]="girisSuruyor()"
               (click)="rolSec(kart.rol)"
             >
-              <span class="text-4xl" aria-hidden="true">{{ kart.ikon }}</span>
+              <app-ikon class="text-4xl" [adi]="kart.ikon" />
               <span>
                 <span class="block text-xl font-semibold text-slate-900">
                   {{ kart.baslik }}

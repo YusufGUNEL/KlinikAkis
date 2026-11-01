@@ -1,5 +1,6 @@
 import { Component, input, output } from '@angular/core';
 import { ButtonModule } from 'primeng/button';
+import { Ikon, IkonAdi } from './ikon';
 
 export type KutuTuru = 'bos' | 'yukleniyor' | 'hata';
 
@@ -9,17 +10,15 @@ export type KutuTuru = 'bos' | 'yukleniyor' | 'hata';
  */
 @Component({
   selector: 'app-durum-kutusu',
-  imports: [ButtonModule],
+  imports: [ButtonModule, Ikon],
   template: `
-    <div
-      class="flex flex-col items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-8 text-center text-slate-700"
-      [attr.role]="tur() === 'hata' ? 'alert' : 'status'"
-    >
-      <span class="text-2xl" aria-hidden="true">{{ ikon() }}</span>
-      <p>{{ mesaj() || varsayilan() }}</p>
+    <div class="flex flex-col items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-8 text-center text-slate-700">
+      <span class="text-2xl"><app-ikon [adi]="ikonAdi()" /></span>
+      <p [attr.role]="tur() === 'hata' ? 'alert' : 'status'">{{ mesaj() || varsayilan() }}</p>
       @if (tur() === 'hata' && yenidenDenenebilir()) {
         <button pButton type="button" class="min-h-12" (click)="yenidenDene.emit()">Yeniden dene</button>
       }
+      <ng-content />
     </div>
   `,
 })
@@ -29,8 +28,8 @@ export class DurumKutusu {
   readonly yenidenDenenebilir = input(true);
   readonly yenidenDene = output();
 
-  protected ikon(): string {
-    return { bos: '○', yukleniyor: '…', hata: '✗' }[this.tur()];
+  protected ikonAdi(): IkonAdi {
+    return this.tur();
   }
 
   protected varsayilan(): string {

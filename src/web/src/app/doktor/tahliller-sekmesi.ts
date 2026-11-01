@@ -36,7 +36,7 @@ interface BekleyenYayin {
     } @else {
       <table class="w-full max-w-4xl border-collapse text-[13px]" data-test="tahlil-tablosu">
         <caption class="sr-only">Tahlil sonuçları; işaret kodla hesaplanır</caption>
-        <thead>
+        <thead class="sticky top-0 z-10 bg-white">
           <tr class="h-9 border-b border-slate-300 text-left text-xs text-slate-600">
             <th scope="col" class="pr-3 font-semibold">Test</th>
             <th scope="col" class="pr-3 text-right font-semibold">Sonuç</th>

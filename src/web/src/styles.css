@@ -56,3 +56,14 @@ body {
   border-color: var(--color-uyari);
   border-width: 2px;
 }
+
+/* Sekme seçimi renk + kalınlıkla da belli olsun; ince alt çizgi tek başına zayıf kalıyordu. */
+.p-tabs .p-tab.p-tab-active {
+  color: var(--color-ana);
+  font-weight: 600;
+}
+
+.p-tabs .p-tablist-active-bar {
+  background: var(--color-ana);
+  height: 3px;
+}

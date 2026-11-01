@@ -34,7 +34,7 @@ import { TrUpperPipe } from '../ortak/tr-upper.pipe';
   template: `
     <main class="flex min-h-dvh flex-col bg-slate-900 p-10 text-white">
       <header class="flex items-start justify-between gap-6">
-        <h1 class="text-[64px] leading-tight font-semibold tracking-wide">
+        <h1 class="max-w-[62%] text-center text-4xl leading-tight font-semibold tracking-wide sm:text-5xl lg:text-[64px]">
           @if (bransAd(); as ad) {
             {{ ad + ' polikliniği' | trUpper }}
           } @else if (branslar.error()) {

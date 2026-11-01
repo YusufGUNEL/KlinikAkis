@@ -12,6 +12,10 @@ public static class HastaEndpointleri
 {
     public static RouteGroupBuilder MapHastaEndpointleri(this RouteGroupBuilder api)
     {
+        api.MapGet("/hasta/me/ozet", KendiOzeti).WithTags("Hasta").WithName("KendiHastaOzeti")
+            .RequireAuthorization(DemoRol.Hasta)
+            .WithSummary("Hasta ekranı için alerji ve sentetik hasta bilgisi");
+
         var hastalar = api.MapGroup("/hastalar/{id:guid}").WithTags("Hasta")
             .RequireAuthorization(DemoRol.Doktor);
 
@@ -26,6 +30,20 @@ public static class HastaEndpointleri
             .WithSummary("Bu hastanın verisine kim, ne zaman, ne yaptı (yeniden eskiye, son 50)");
 
         return api;
+    }
+
+    private static async Task<Results<Ok<HastaOzeti>, ProblemHttpResult>> KendiOzeti(
+        ClaimsPrincipal kullanici, KlinikDbContext db, TimeProvider zaman, CancellationToken ct)
+    {
+        var id = Guid.Parse(kullanici.FindFirstValue(DemoClaim.HastaId)!);
+        var h = await db.Hastalar.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (h is null)
+            return TypedResults.Problem(detail: "Hasta bulunamadı.", statusCode: StatusCodes.Status404NotFound);
+
+        return TypedResults.Ok(new HastaOzeti(
+            h.Id, h.Ad, h.Soyad, IstanbulSaati.Yas(h.DogumTarihi, zaman.GetUtcNow().UtcDateTime), h.Cinsiyet,
+            TcMaskele(h.TcKimlik), h.TakmaAd, h.Alerjiler, h.KronikHastaliklar, h.KullandigiIlaclar,
+            h.AcikRizaAlindi, h.Sentetik));
     }
 
     private static async Task<Ok<List<ErisimSatiri>>> Erisim(Guid id, KlinikDbContext db, CancellationToken ct) =>

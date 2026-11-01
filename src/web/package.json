@@ -3,12 +3,8 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "lisans": "node scripts/lisans-yaz.mjs",
-    "prestart": "npm run lisans",
     "start": "ng serve",
-    "prebuild": "npm run lisans",
     "build": "ng build",
-    "pretest": "npm run lisans",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },

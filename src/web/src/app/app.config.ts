@@ -6,7 +6,6 @@ import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { providePrimeNG } from 'primeng/config';
 import { routes } from './app.routes';
 import { yetkiInterceptor } from './cekirdek/yetki.interceptor';
-import { PRIMEUI_LISANS } from './lisans';
 import { KlinikPreset } from './tema';
 
 registerLocaleData(localeTr);
@@ -22,7 +21,6 @@ export const appConfig: ApplicationConfig = {
     // Türkiye 2016'dan beri yaz saati uygulamıyor: sabit +03:00.
     { provide: DATE_PIPE_DEFAULT_OPTIONS, useValue: { timezone: '+0300', dateFormat: 'dd.MM.yyyy' } },
     providePrimeNG({
-      license: PRIMEUI_LISANS,
       theme: {
         preset: KlinikPreset,
         options: {
